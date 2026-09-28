@@ -1,0 +1,14 @@
+Makefile
+*.o
+moc_*.cpp
+harbour-radiox
+rpms/
+.sfdk/
+.mimocode/
+debugfiles.list
+debuglinks.list
+debugsourcefiles.list
+debugsources.list
+documentation.list
+elfbins.listtests/build/
+.qmake.stash

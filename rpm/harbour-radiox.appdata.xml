@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>harbour-radiox</id>
+  <name>radio x</name>
+  <summary>Frankfurter Stadtradio schedule, recordings and livestream</summary>
+  <description>
+    <p>harbour-radiox displays the weekly program schedule of radio x
+    (Frankfurter Stadtradio, FM 91,8). Browse the +7 mediathek recordings,
+    read sendetipps, and listen to the livestream.</p>
+  </description>
+  <url type="homepage">https://www.radiox.de</url>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <releases>
+    <release version="0.1.0" date="2026-09-28">
+      <description><p>Initial release.</p></description>
+    </release>
+  </releases>
+</component>
