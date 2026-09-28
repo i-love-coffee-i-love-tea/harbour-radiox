@@ -1,6 +1,8 @@
 #include "networkfetcher.h"
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QFile>
+#include <QTextStream>
 #include <functional>
 
 NetworkFetcher::NetworkFetcher(QObject *parent, QNetworkAccessManager *nam)
@@ -30,11 +32,22 @@ static void getAndEmit(QNetworkAccessManager *nam, const QUrl &url,
     QNetworkReply *reply = nam->get(req);
     QObject::connect(reply, &QNetworkReply::finished, ctx, [=]() {
         reply->deleteLater();
+        // Write debug to file for device debugging
+        QFile logFile("/tmp/harbour-radiox.log");
+        logFile.open(QIODevice::Append | QIODevice::Text);
+        QTextStream ts(&logFile);
+        ts << "URL: " << url.toString() << "\n";
+        ts << "Error: " << reply->error() << " " << reply->errorString() << "\n";
         if (reply->error() != QNetworkReply::NoError) {
+            ts << "FAILED\n---\n";
+            logFile.close();
             onError(reply->errorString());
             return;
         }
         QString html = QString::fromUtf8(reply->readAll());
+        ts << "Bytes: " << html.size() << "\n";
+        ts << "First 200: " << html.left(200) << "\n---\n";
+        logFile.close();
         onSuccess(html);
     });
 }

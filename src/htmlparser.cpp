@@ -1,19 +1,105 @@
 #include "htmlparser.h"
+#include <libxml/HTMLparser.h>
+#include <libxml/xpath.h>
+#include <libxml/xpathInternals.h>
 #include <QRegularExpression>
 
 // ---------------------------------------------------------------------------
-// decodeEntities – lightweight HTML entity decoder
+// libxml2 helpers
 // ---------------------------------------------------------------------------
-QString HtmlParser::decodeEntities(const QString &text)
+
+static QString nodeText(xmlNodePtr node)
 {
-    QString result = text;
-    result.replace("&amp;",  "&");
-    result.replace("&lt;",   "<");
-    result.replace("&gt;",   ">");
-    result.replace("&quot;", "\"");
-    result.replace("&#039;", "'");
-    result.replace("&nbsp;", " ");
+    if (!node) return QString();
+    xmlChar *content = xmlNodeGetContent(node);
+    if (!content) return QString();
+    QString result = QString::fromUtf8(reinterpret_cast<const char*>(content));
+    xmlFree(content);
     return result.trimmed();
+}
+
+static QString nodeAttr(xmlNodePtr node, const char *name)
+{
+    if (!node) return QString();
+    xmlChar *val = xmlGetProp(node, BAD_CAST name);
+    if (!val) return QString();
+    QString result = QString::fromUtf8(reinterpret_cast<const char*>(val));
+    xmlFree(val);
+    return result;
+}
+
+static xmlXPathObjectPtr xpathEval(xmlDocPtr doc, xmlNodePtr ctxNode, const char *expr)
+{
+    xmlXPathContextPtr ctx = xmlXPathNewContext(doc);
+    if (!ctx) return nullptr;
+    ctx->node = ctxNode;
+    xmlXPathObjectPtr result = xmlXPathEvalExpression(BAD_CAST expr, ctx);
+    xmlXPathFreeContext(ctx);
+    return result;
+}
+
+static int xpathNodeCount(xmlXPathObjectPtr obj)
+{
+    if (!obj || !obj->nodesetval) return 0;
+    return obj->nodesetval->nodeNr;
+}
+
+static xmlNodePtr xpathNode(xmlXPathObjectPtr obj, int index)
+{
+    if (!obj || !obj->nodesetval) return nullptr;
+    if (index < 0 || index >= obj->nodesetval->nodeNr) return nullptr;
+    return obj->nodesetval->nodeTab[index];
+}
+
+// Walk previous siblings to find text containing a time pattern (HH:MM)
+static QString findTimeBefore(xmlNodePtr node)
+{
+    for (xmlNodePtr cur = node->prev; cur; cur = cur->prev) {
+        if (cur->type == XML_TEXT_NODE) {
+            QString text = QString::fromUtf8(reinterpret_cast<const char*>(cur->content));
+            QRegularExpression re(QStringLiteral("(\\d{2}:\\d{2})"));
+            QRegularExpressionMatch m = re.match(text);
+            if (m.hasMatch())
+                return m.captured(1);
+        }
+    }
+    return QString();
+}
+
+// Walk next siblings after a node to find the next element of a given tag
+static xmlNodePtr findNextElement(xmlNodePtr node, const char *tag)
+{
+    for (xmlNodePtr cur = node->next; cur; cur = cur->next) {
+        if (cur->type == XML_ELEMENT_NODE &&
+            xmlStrcasecmp(cur->name, BAD_CAST tag) == 0)
+            return cur;
+    }
+    return nullptr;
+}
+
+// Walk next siblings after a node to collect text until the next element
+static QString textAfterElement(xmlNodePtr element)
+{
+    QString result;
+    for (xmlNodePtr cur = element->next; cur; cur = cur->next) {
+        if (cur->type == XML_TEXT_NODE) {
+            result += QString::fromUtf8(reinterpret_cast<const char*>(cur->content));
+        } else if (cur->type == XML_ELEMENT_NODE) {
+            break;
+        }
+    }
+    return result.trimmed();
+}
+
+static xmlDocPtr parseHtml(const QString &html)
+{
+    QByteArray utf8 = html.toUtf8();
+    return htmlReadDoc(
+        BAD_CAST utf8.constData(),
+        nullptr, // URL
+        "UTF-8",
+        HTML_PARSE_RECOVER | HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING | HTML_PARSE_NONET
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -24,148 +110,149 @@ QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &wee
     QList<ProgramDay> days;
     weekLabel.clear();
 
+    xmlDocPtr doc = parseHtml(html);
+    if (!doc) return days;
+
     // 1. Week label
-    QRegularExpression weekRe(
-        QStringLiteral("<div\\s+class=\"program-week-header\">(.*?)</div>"),
-        QRegularExpression::DotMatchesEverythingOption);
-    QRegularExpressionMatch weekMatch = weekRe.match(html);
-    if (weekMatch.hasMatch())
-        weekLabel = decodeEntities(weekMatch.captured(1).trimmed());
+    xmlXPathObjectPtr weekObj = xpathEval(doc, nullptr,
+        "//div[@class='program-week-header']/p");
+    if (weekObj) {
+        xmlNodePtr weekNode = xpathNode(weekObj, 0);
+        if (weekNode)
+            weekLabel = nodeText(weekNode);
+        xmlXPathFreeObject(weekObj);
+    }
 
-    // 2. Day labels from thead <th class="day">
-    QRegularExpression dayRe(
-        QStringLiteral("<th\\s+class=\"day\">(.*?)</th>"),
-        QRegularExpression::DotMatchesEverythingOption);
-    QRegularExpressionMatchIterator dayIt = dayRe.globalMatch(html);
-    QStringList dayLabels;
-    while (dayIt.hasNext())
-        dayLabels << decodeEntities(dayIt.next().captured(1).trimmed());
+    // 2. Day labels
+    xmlXPathObjectPtr dayObj = xpathEval(doc, nullptr, "//th[@class='day']");
+    if (!dayObj) { xmlFreeDoc(doc); return days; }
 
-    if (dayLabels.size() != 7)
+    int dayCount = xpathNodeCount(dayObj);
+    if (dayCount != 7) {
+        xmlXPathFreeObject(dayObj);
+        xmlFreeDoc(doc);
         return days;
+    }
 
     for (int d = 0; d < 7; ++d) {
         ProgramDay pd;
-        pd.dayLabel = dayLabels[d];
+        pd.dayLabel = nodeText(xpathNode(dayObj, d));
         days << pd;
     }
+    xmlXPathFreeObject(dayObj);
 
-    // 3. Extract tbody
-    QRegularExpression tbodyRe(
-        QStringLiteral("<tbody>(.*?)</tbody>"),
-        QRegularExpression::DotMatchesEverythingOption);
-    QRegularExpressionMatch tbodyMatch = tbodyRe.match(html);
-    if (!tbodyMatch.hasMatch())
-        return days;
+    // 3. Iterate rows
+    xmlXPathObjectPtr rowObj = xpathEval(doc, nullptr,
+        "//table[@id='weektable']//tbody/tr[@class='tbodytr']");
+    if (!rowObj) { xmlFreeDoc(doc); return days; }
 
-    QString tbody = tbodyMatch.captured(1);
+    int rowCount = xpathNodeCount(rowObj);
 
-    // 4. Iterate over <tr> rows
-    QRegularExpression trRe(
-        QStringLiteral("<tr>(.*?)</tr>"),
-        QRegularExpression::DotMatchesEverythingOption);
-    QRegularExpressionMatchIterator trIt = trRe.globalMatch(tbody);
+    for (int r = 0; r < rowCount; ++r) {
+        xmlNodePtr rowNode = xpathNode(rowObj, r);
 
-    // Regex for <td> cells (captures attrs + inner content)
-    QRegularExpression tdRe(
-        QStringLiteral("<td([^>]*)>(.*?)</td>"),
-        QRegularExpression::DotMatchesEverythingOption);
+        // Hour from first time cell
+        xmlXPathObjectPtr hourObj = xpathEval(doc, rowNode,
+            "td[contains(@class,'time_show_week')]");
+        if (!hourObj) continue;
 
-    // Regex for <a> inside a cell
-    QRegularExpression aRe(
-        QStringLiteral("<a[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>"),
-        QRegularExpression::DotMatchesEverythingOption);
+        int hourCount = xpathNodeCount(hourObj);
+        if (hourCount < 1) { xmlXPathFreeObject(hourObj); continue; }
 
-    // Regex for subtitle after <br/> or <br>
-    QRegularExpression brRe(
-        QStringLiteral("<br\\s*/?>\\s*(.+)$"),
-        QRegularExpression::DotMatchesEverythingOption);
-
-    // Regex for [Sendetipp: <a href="...">...</a>]
-    QRegularExpression sendetippRe(
-        QStringLiteral("\\[Sendetipp:.*?<a[^>]*href=\"([^\"]+)\""),
-        QRegularExpression::DotMatchesEverythingOption);
-
-    while (trIt.hasNext()) {
-        QRegularExpressionMatch trMatch = trIt.next();
-        QString rowHtml = trMatch.captured(1);
-
-        // Collect all <td> cells in this row
-        QList<QPair<QString, QString>> cells; // (attributes, innerHTML)
-        QRegularExpressionMatchIterator tdIt = tdRe.globalMatch(rowHtml);
-        while (tdIt.hasNext()) {
-            QRegularExpressionMatch m = tdIt.next();
-            cells << qMakePair(m.captured(1), m.captured(2));
-        }
-
-        if (cells.size() < 2)
-            continue; // need at least hour + 1 day cell
-
-        // First cell is the hour (time_show_week tablesaw-cell-persist)
-        QString hourText = decodeEntities(cells.first().second);
-        hourText.remove(QRegularExpression(QStringLiteral("[^0-9]")));
+        QString hourStr = nodeText(xpathNode(hourObj, 0));
         bool ok;
-        int hour = hourText.toInt(&ok);
-        if (!ok)
-            continue;
+        int hour = hourStr.toInt(&ok);
+        xmlXPathFreeObject(hourObj);
+        if (!ok) continue;
 
-        // Remaining cells are the 7 day columns (index 1..7)
-        for (int d = 0; d < 7 && (d + 1) < cells.size(); ++d) {
+        // Day cells (cells with class containing 'hour_')
+        xmlXPathObjectPtr cellObj = xpathEval(doc, rowNode,
+            "td[contains(@class,'hour_')]");
+        if (!cellObj) continue;
+
+        int cellCount = xpathNodeCount(cellObj);
+
+        for (int d = 0; d < 7 && d < cellCount; ++d) {
+            xmlNodePtr cellNode = xpathNode(cellObj, d);
             ScheduleSlot slot;
             slot.hour = hour;
 
-            const QString attrs = cells.at(d + 1).first;
-            const QString content = cells.at(d + 1).second;
+            QString cellClass = nodeAttr(cellNode, "class");
 
-            // --- dito check ---
-            if (attrs.contains(QStringLiteral("_dito"))) {
+            // Dito check
+            if (cellClass.contains(QStringLiteral("_dito"))) {
                 slot.isDito = true;
                 days[d].entries << slot;
                 continue;
             }
 
-            // --- repeat check ---
-            if (content.contains(QStringLiteral("(Wdh.)")))
-                slot.isRepeat = true;
+            // Get show_week_hour div content
+            xmlXPathObjectPtr divObj = xpathEval(doc, cellNode,
+                "div[@class='show_week_hour']");
+            if (!divObj || xpathNodeCount(divObj) == 0) {
+                if (divObj) xmlXPathFreeObject(divObj);
+                days[d].entries << slot;
+                continue;
+            }
+            xmlNodePtr divNode = xpathNode(divObj, 0);
 
-            // --- <a> extraction (show name + slug) ---
-            QRegularExpressionMatch aMatch = aRe.match(content);
-            if (aMatch.hasMatch()) {
-                QString href = aMatch.captured(1);
-                slot.showName = decodeEntities(aMatch.captured(2));
-                // derive slug from last path segment
+            // Full text of the div (for repeat/sendetipp checks)
+            QString fullText = nodeText(divNode);
+
+            // Show name from <a>
+            xmlXPathObjectPtr aObj = xpathEval(doc, divNode, "a[1]");
+            if (aObj && xpathNodeCount(aObj) > 0) {
+                xmlNodePtr aNode = xpathNode(aObj, 0);
+                slot.showName = nodeText(aNode);
+                // Slug from href
+                QString href = nodeAttr(aNode, "href");
                 int lastSlash = href.lastIndexOf(QLatin1Char('/'));
                 slot.slug = (lastSlash >= 0) ? href.mid(lastSlash + 1) : href;
+                xmlXPathFreeObject(aObj);
+            } else {
+                if (aObj) xmlXPathFreeObject(aObj);
+                // No link — plain text show name (e.g. "Musikmix")
+                slot.showName = fullText;
+                // Remove any (Wdh.) or [Sendetipp...] from it
+                slot.showName.remove(QStringLiteral("(Wdh.)"));
+                slot.showName.remove(QRegularExpression(QStringLiteral("\\[.*?Sendetipp.*?\\]")));
+                slot.showName = slot.showName.trimmed();
             }
 
-            // --- subtitle / sendetipp after <br/> ---
-            QRegularExpressionMatch brMatch = brRe.match(content);
-            if (brMatch.hasMatch()) {
-                QString afterBr = brMatch.captured(1).trimmed();
+            // Repeat check
+            slot.isRepeat = fullText.contains(QStringLiteral("(Wdh.)"));
 
-                QRegularExpressionMatch sendetippMatch = sendetippRe.match(afterBr);
-                if (sendetippMatch.hasMatch()) {
-                    slot.sendetippUrl = sendetippMatch.captured(1);
-                } else {
-                    // Plain subtitle – strip residual HTML tags
-                    QString sub = afterBr;
-                    sub.remove(QRegularExpression(QStringLiteral("<[^>]+>")));
-                    sub.remove(QStringLiteral("(Wdh.)"));
-                    slot.subtitle = decodeEntities(sub);
+            // Subtitle: text after <br/> in the div
+            xmlNodePtr brNode = findNextElement(divNode->children, "br");
+            if (brNode) {
+                QString afterBr = textAfterElement(brNode);
+                // Strip (Wdh.) and [Sendetipp...] markup
+                afterBr.remove(QStringLiteral("(Wdh.)"));
+                afterBr.remove(QRegularExpression(QStringLiteral("\\[.*?Sendetipp.*?\\]")));
+                slot.subtitle = afterBr.trimmed();
+            }
+
+            // Sendetipp link
+            if (fullText.contains(QStringLiteral("Sendetipp"))) {
+                xmlXPathObjectPtr stObj = xpathEval(doc, divNode,
+                    ".//a[contains(@href,'sendetipps')]");
+                if (stObj && xpathNodeCount(stObj) > 0) {
+                    slot.sendetippUrl = nodeAttr(xpathNode(stObj, 0), "href");
+                    xmlXPathFreeObject(stObj);
+                } else if (stObj) {
+                    xmlXPathFreeObject(stObj);
                 }
             }
 
-            // --- sendetipp that might appear without preceding <br/> ---
-            if (slot.sendetippUrl.isEmpty()) {
-                QRegularExpressionMatch sendetippMatch2 = sendetippRe.match(content);
-                if (sendetippMatch2.hasMatch())
-                    slot.sendetippUrl = sendetippMatch2.captured(1);
-            }
-
+            xmlXPathFreeObject(divObj);
             days[d].entries << slot;
         }
+
+        xmlXPathFreeObject(cellObj);
     }
 
+    xmlXPathFreeObject(rowObj);
+    xmlFreeDoc(doc);
     return days;
 }
 
@@ -176,59 +263,73 @@ QList<Recording> HtmlParser::parseRecordings(const QString &html)
 {
     QList<Recording> recordings;
 
-    // Split by <p class="plus7-day"> sections (the actual radiox.de structure)
-    QRegularExpression daySectionRe(
-        QStringLiteral("<p\\s+class=\"plus7-day\">(.*?)</p>"),
-        QRegularExpression::DotMatchesEverythingOption);
-    QRegularExpressionMatchIterator dayIt = daySectionRe.globalMatch(html);
+    xmlDocPtr doc = parseHtml(html);
+    if (!doc) return recordings;
 
-    while (dayIt.hasNext()) {
-        QRegularExpressionMatch dayMatch = dayIt.next();
-        QString section = dayMatch.captured(1);
+    // Each <p class="plus7-day"> is a day section
+    xmlXPathObjectPtr sectionObj = xpathEval(doc, nullptr,
+        "//p[contains(@class,'plus7-day')]");
+    if (!sectionObj) { xmlFreeDoc(doc); return recordings; }
 
-        // Extract date: "Montag, 28.09.2026" or "Monday, 28.09.2026"
-        QRegularExpression dateRe(QStringLiteral("\\d{2}\\.\\d{2}\\.\\d{4}"));
-        QRegularExpressionMatch dateMatch = dateRe.match(section);
+    int sectionCount = xpathNodeCount(sectionObj);
+
+    for (int s = 0; s < sectionCount; ++s) {
+        xmlNodePtr sectionNode = xpathNode(sectionObj, s);
+
+        // Extract date from text content: "Montag, 28.09.2026"
+        QString sectionText = nodeText(sectionNode);
+        QRegularExpression dateRe(QStringLiteral("(\\d{2}\\.\\d{2}\\.\\d{4})"));
+        QRegularExpressionMatch dateMatch = dateRe.match(sectionText);
         QDate sectionDate;
         if (dateMatch.hasMatch())
-            sectionDate = QDate::fromString(dateMatch.captured(0), QStringLiteral("dd.MM.yyyy"));
+            sectionDate = QDate::fromString(dateMatch.captured(1), QStringLiteral("dd.MM.yyyy"));
 
-        // Each recording block: time + <a onclick="plus7_show_recording(ID)">showName</a> + subtitle
-        // Split on time patterns (HH:MM) to find each recording
-        QRegularExpression recBlockRe(
-            QStringLiteral("(\\d{2}:\\d{2})\\s*&nbsp;.*?plus7_show_recording\\((\\d+)\\).*?<\\/button>\\s*(.*?)(?=\\d{2}:\\d{2}|$)"),
-            QRegularExpression::DotMatchesEverythingOption);
-        QRegularExpressionMatchIterator recIt = recBlockRe.globalMatch(section);
+        // Find all recording links within this section
+        xmlXPathObjectPtr linkObj = xpathEval(doc, sectionNode,
+            ".//a[contains(@onclick,'plus7_show_recording')]");
+        if (!linkObj) continue;
 
-        while (recIt.hasNext()) {
-            QRegularExpressionMatch recMatch = recIt.next();
+        int linkCount = xpathNodeCount(linkObj);
+
+        for (int i = 0; i < linkCount; ++i) {
+            xmlNodePtr aNode = xpathNode(linkObj, i);
             Recording rec;
             rec.date = sectionDate;
-            rec.time = QTime::fromString(recMatch.captured(1), QStringLiteral("HH:mm"));
-            rec.id = recMatch.captured(2).toInt();
-            rec.playbackUrl = QStringLiteral("/plus7/ajax/player/") + QString::number(rec.id);
 
-            // Show name: extract from <a> tag in the captured block
-            QString block = recMatch.captured(0);
-            QRegularExpression showRe(
-                QStringLiteral("<a[^>]*>\\s*([^<]+?)\\s*</a>"),
-                QRegularExpression::DotMatchesEverythingOption);
-            QRegularExpressionMatch showMatch = showRe.match(block);
-            if (showMatch.hasMatch())
-                rec.showName = decodeEntities(showMatch.captured(1));
+            // Show name
+            rec.showName = nodeText(aNode);
 
-            // Subtitle: text after </button> (captured group 3)
-            QString afterButton = recMatch.captured(3).trimmed();
-            // Strip any remaining HTML tags
-            afterButton.remove(QRegularExpression(QStringLiteral("<[^>]+>")));
-            afterButton = decodeEntities(afterButton);
-            if (!afterButton.isEmpty())
-                rec.subtitle = afterButton;
+            // Recording ID from onclick
+            QString onclick = nodeAttr(aNode, "onclick");
+            QRegularExpression idRe(QStringLiteral("plus7_show_recording\\((\\d+)\\)"));
+            QRegularExpressionMatch idMatch = idRe.match(onclick);
+            if (idMatch.hasMatch()) {
+                rec.id = idMatch.captured(1).toInt();
+                rec.playbackUrl = QStringLiteral("/plus7/ajax/player/") + QString::number(rec.id);
+            }
+
+            // Time: look backwards in preceding text nodes
+            QString timeStr = findTimeBefore(aNode);
+            rec.time = QTime::fromString(timeStr, QStringLiteral("HH:mm"));
+
+            // Subtitle: text after the next <button> sibling
+            xmlNodePtr btnNode = findNextElement(aNode->next, "button");
+            if (btnNode) {
+                QString sub = textAfterElement(btnNode);
+                // Remove HTML entities artifacts
+                sub = sub.trimmed();
+                if (!sub.isEmpty())
+                    rec.subtitle = sub;
+            }
 
             recordings << rec;
         }
+
+        xmlXPathFreeObject(linkObj);
     }
 
+    xmlXPathFreeObject(sectionObj);
+    xmlFreeDoc(doc);
     return recordings;
 }
 
@@ -239,64 +340,71 @@ QList<Sendetipp> HtmlParser::parseSendetipps(const QString &html)
 {
     QList<Sendetipp> tipps;
 
-    // Match each <article class="sendetipp"> ... </article>
-    QRegularExpression articleRe(
-        QStringLiteral("<article\\s+class=\"sendetipp\">(.*?)</article>"),
-        QRegularExpression::DotMatchesEverythingOption);
-    QRegularExpressionMatchIterator artIt = articleRe.globalMatch(html);
+    xmlDocPtr doc = parseHtml(html);
+    if (!doc) return tipps;
 
-    while (artIt.hasNext()) {
-        QRegularExpressionMatch artMatch = artIt.next();
-        QString block = artMatch.captured(1);
+    // Each sendetipp is a <div class="item ..." itemprop="blogPost">
+    xmlXPathObjectPtr itemObj = xpathEval(doc, nullptr,
+        "//div[@itemprop='blogPost']");
+    if (!itemObj) { xmlFreeDoc(doc); return tipps; }
+
+    int itemCount = xpathNodeCount(itemObj);
+
+    for (int i = 0; i < itemCount; ++i) {
+        xmlNodePtr itemNode = xpathNode(itemObj, i);
         Sendetipp t;
 
-        // Title from <h2><a href="...">...</a></h2>
-        QRegularExpression titleRe(
-            QStringLiteral("<h2>\\s*<a[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>\\s*</h2>"),
-            QRegularExpression::DotMatchesEverythingOption);
-        QRegularExpressionMatch titleMatch = titleRe.match(block);
-        if (titleMatch.hasMatch())
-            t.title = decodeEntities(titleMatch.captured(2));
+        // Title
+        xmlXPathObjectPtr titleObj = xpathEval(doc, itemNode,
+            ".//h2[@itemprop='name']");
+        if (titleObj && xpathNodeCount(titleObj) > 0)
+            t.title = nodeText(xpathNode(titleObj, 0));
+        if (titleObj) xmlXPathFreeObject(titleObj);
 
-        // Show name + slug from <div class="sendetipp-show"><a href="...">...</a></div>
-        QRegularExpression showRe(
-            QStringLiteral("<div\\s+class=\"sendetipp-show\">\\s*<a[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>"),
-            QRegularExpression::DotMatchesEverythingOption);
-        QRegularExpressionMatch showMatch = showRe.match(block);
-        if (showMatch.hasMatch()) {
-            t.showName = decodeEntities(showMatch.captured(2));
-            QString href = showMatch.captured(1);
+        // Show name + slug
+        xmlXPathObjectPtr showObj = xpathEval(doc, itemNode,
+            ".//a[contains(@href,'/sendungen/')]");
+        if (showObj && xpathNodeCount(showObj) > 0) {
+            xmlNodePtr showNode = xpathNode(showObj, 0);
+            t.showName = nodeText(showNode);
+            QString href = nodeAttr(showNode, "href");
             int lastSlash = href.lastIndexOf(QLatin1Char('/'));
             t.showSlug = (lastSlash >= 0) ? href.mid(lastSlash + 1) : href;
         }
+        if (showObj) xmlXPathFreeObject(showObj);
 
-        // Date/time
-        QRegularExpression metaRe(
-            QStringLiteral("<div\\s+class=\"sendetipp-meta\">(.*?)</div>"),
-            QRegularExpression::DotMatchesEverythingOption);
-        QRegularExpressionMatch metaMatch = metaRe.match(block);
-        if (metaMatch.hasMatch())
-            t.dateTime = decodeEntities(metaMatch.captured(1));
+        // Date/time from first <strong>
+        xmlXPathObjectPtr strongObj = xpathEval(doc, itemNode,
+            ".//strong[1]");
+        if (strongObj && xpathNodeCount(strongObj) > 0)
+            t.dateTime = nodeText(xpathNode(strongObj, 0));
+        if (strongObj) xmlXPathFreeObject(strongObj);
 
-        // Description
-        QRegularExpression descRe(
-            QStringLiteral("<div\\s+class=\"sendetipp-description\">(.*?)</div>"),
-            QRegularExpression::DotMatchesEverythingOption);
-        QRegularExpressionMatch descMatch = descRe.match(block);
-        if (descMatch.hasMatch())
-            t.description = decodeEntities(descMatch.captured(1));
+        // Description: <p> that doesn't contain <strong>, <a>, or <img>
+        xmlXPathObjectPtr descObj = xpathEval(doc, itemNode,
+            ".//p[not(.//strong) and not(.//a) and not(.//img)]");
+        if (descObj && xpathNodeCount(descObj) > 0)
+            t.description = nodeText(xpathNode(descObj, 0));
+        if (descObj) xmlXPathFreeObject(descObj);
 
         // Image
-        QRegularExpression imgRe(
-            QStringLiteral("<img\\s+class=\"sendetipp-image\"\\s+src=\"([^\"]+)\""),
-            QRegularExpression::DotMatchesEverythingOption);
-        QRegularExpressionMatch imgMatch = imgRe.match(block);
-        if (imgMatch.hasMatch())
-            t.imageUrl = imgMatch.captured(1);
+        xmlXPathObjectPtr imgObj = xpathEval(doc, itemNode,
+            ".//img/@src");
+        if (imgObj && xpathNodeCount(imgObj) > 0) {
+            xmlNodePtr srcNode = xpathNode(imgObj, 0);
+            // For attribute nodes, content is the attribute value
+            if (srcNode->type == XML_ATTRIBUTE_NODE) {
+                t.imageUrl = QString::fromUtf8(
+                    reinterpret_cast<const char*>(srcNode->children->content));
+            }
+        }
+        if (imgObj) xmlXPathFreeObject(imgObj);
 
         tipps << t;
     }
 
+    xmlXPathFreeObject(itemObj);
+    xmlFreeDoc(doc);
     return tipps;
 }
 

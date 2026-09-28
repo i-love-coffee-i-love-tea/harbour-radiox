@@ -33,6 +33,18 @@ RadioXCore::RadioXCore(QObject *parent)
         m_lastInfo = QStringLiteral("Recordings loaded");
         emit lastInfoChanged();
     });
+
+    // Set loading=false when any data arrives or on error
+    auto finishLoading = [this]() {
+        if (m_loading) {
+            m_loading = false;
+            emit loadingChanged();
+        }
+    };
+    connect(m_fetcher, &NetworkFetcher::programWeekReceived, this, finishLoading);
+    connect(m_fetcher, &NetworkFetcher::recordingsReceived, this, finishLoading);
+    connect(m_fetcher, &NetworkFetcher::sendetippsReceived, this, finishLoading);
+    connect(m_fetcher, &NetworkFetcher::networkError, this, finishLoading);
 }
 
 ProgramModel* RadioXCore::programModel() const { return m_programModel; }
@@ -57,6 +69,8 @@ QString RadioXCore::lastInfo() const
 
 void RadioXCore::refresh()
 {
+    m_loading = true;
+    emit loadingChanged();
     m_lastInfo = QStringLiteral("Refreshing...");
     emit lastInfoChanged();
     m_fetcher->fetchProgramWeek(m_programModel->weekOffset());

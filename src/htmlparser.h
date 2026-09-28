@@ -48,9 +48,6 @@ public:
     static QList<Recording> parseRecordings(const QString &html);
     static QList<Sendetipp> parseSendetipps(const QString &html);
     static QVariantMap parseShowDetail(const QString &html);
-
-private:
-    static QString decodeEntities(const QString &text);
 };
 
 #endif // HTMLPARSER_H

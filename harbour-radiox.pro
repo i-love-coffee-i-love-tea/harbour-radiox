@@ -2,6 +2,7 @@ TARGET = harbour-radiox
 
 CONFIG += sailfishapp
 QT += quick qml network multimedia
+PKGCONFIG += libxml-2.0
 
 SOURCES += \
     src/main.cpp \

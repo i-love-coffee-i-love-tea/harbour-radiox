@@ -23,7 +23,7 @@ CoverBackground {
         }
 
         Label {
-            text: app.currentPlaybackUrl.length > 0
+            text: radioXCore.playbackUrl.length > 0
                   ? qsTr("Playing…")
                   : qsTr("Stopped")
             anchors.horizontalCenter: parent.horizontalCenter
@@ -36,12 +36,12 @@ CoverBackground {
         id: coverActions
 
         CoverAction {
-            iconSource: app.currentPlaybackUrl.length > 0
+            iconSource: radioXCore.playbackUrl.length > 0
                         ? "image://theme/icon-cover-pause"
                         : "image://theme/icon-cover-play"
             onTriggered: {
-                if (app.currentPlaybackUrl.length > 0) {
-                    app.currentPlaybackUrl = ""
+                if (radioXCore.playbackUrl.length > 0) {
+                    radioXCore.stopPlayback()
                 } else {
                     radioXCore.openLivestream()
                 }
