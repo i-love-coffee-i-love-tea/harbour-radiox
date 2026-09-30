@@ -10,6 +10,10 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+env:
+  SDK_RELEASE: '4.6.0.13'
+  DOCKER_IMAGE: 'coderus/sailfishos-platform-sdk:4.6.0.13'
+
 jobs:
   version-check:
     name: Version Consistency Check
@@ -40,12 +44,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Pull SDK image
+        run: docker image pull ${{ env.DOCKER_IMAGE }}
+
       - name: Build RPM package
-        uses: R1tschY/sailfish-build-rpm@v1
-        with:
-          arch: ${{ matrix.arch }}
-          release: '5.1.0.11'
-          output-dir: ./rpms
+        run: |
+          chmod 777 "$PWD"
+          mkdir -p rpms && chmod 777 rpms
+          docker run --rm --privileged \
+            -v "$PWD:/home/mersdk/project" \
+            --workdir /home/mersdk/project \
+            ${{ env.DOCKER_IMAGE }} \
+            mb2 --no-fix-version --output-dir rpms \
+                -t SailfishOS-${{ env.SDK_RELEASE }}-${{ matrix.arch }} build
 
       - name: Upload RPM Artifact
         uses: actions/upload-artifact@v7
