@@ -13,18 +13,19 @@ TARGET="${SAILFISH_TARGET:-SailfishOS-5.1.0.11-aarch64}"
 
 echo "=== Building harbour-radiox via sfdk (target: $TARGET) ==="
 cd "$SCRIPT_DIR"
-sfdk -c target="$TARGET" build --build-dir build
+sfdk -c target="$TARGET" build
 
 echo "=== Copying RPM to rpms/ ==="
 mkdir -p "$SCRIPT_DIR/rpms"
-if ls "$SCRIPT_DIR"/build/RPMS/*.rpm >/dev/null 2>&1; then
-    mv "$SCRIPT_DIR"/build/RPMS/*.rpm "$SCRIPT_DIR/rpms/"
-elif ls "$SCRIPT_DIR"/RPMS/*.rpm >/dev/null 2>&1; then
+if ls "$SCRIPT_DIR"/RPMS/*.rpm >/dev/null 2>&1; then
     mv "$SCRIPT_DIR"/RPMS/*.rpm "$SCRIPT_DIR/rpms/"
     rmdir "$SCRIPT_DIR/RPMS" 2>/dev/null || true
 else
-    echo "WARNING: No RPMs found in build/RPMS/ or RPMS/" >&2
+    echo "WARNING: No RPMs found in RPMS/" >&2
 fi
+
+echo "=== Cleaning build artifacts from project root ==="
+rm -f "$SCRIPT_DIR"/*.o "$SCRIPT_DIR"/moc_*.cpp "$SCRIPT_DIR"/moc_*.o "$SCRIPT_DIR"/harbour-radiox
 
 echo "=== Done ==="
 ls -lh "$SCRIPT_DIR/rpms/"*.rpm 2>/dev/null || true
