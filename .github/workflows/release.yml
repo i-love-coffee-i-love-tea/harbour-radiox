@@ -48,7 +48,7 @@ jobs:
         uses: R1tschY/sailfish-build-rpm@v1
         with:
           arch: ${{ matrix.arch }}
-          release: '4.6.0.13'
+          release: '5.1.0.11'
           output-dir: ./rpms
 
       - name: Upload RPM Artifact
