@@ -26,3 +26,7 @@ OTHER_FILES += \
     qml/pages/*.qml \
     qml/components/*.qml \
     qml/cover/*.qml
+
+TRANSLATIONS += \
+    translations/harbour-radiox-en.ts \
+    translations/harbour-radiox-de.ts

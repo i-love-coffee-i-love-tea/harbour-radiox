@@ -297,7 +297,7 @@ Page {
             Repeater {
                 model: radioXCore.programModel.dayLabels.length >= 7
                        ? radioXCore.programModel.dayLabels
-                       : [qsTr("Mo"), qsTr("Di"), qsTr("Mi"), qsTr("Do"), qsTr("Fr"), qsTr("Sa"), qsTr("So")]
+                       : [qsTr("Mon"), qsTr("Tue"), qsTr("Wed"), qsTr("Thu"), qsTr("Fri"), qsTr("Sat"), qsTr("Sun")]
 
                 delegate: Item {
                     property string rawLabel: modelData

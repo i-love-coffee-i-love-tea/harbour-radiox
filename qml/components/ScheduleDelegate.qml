@@ -112,7 +112,7 @@ ListItem {
                     active: scheduleDelegate.isRepeat && !scheduleDelegate.isLive
                     anchors.verticalCenter: parent.verticalCenter
                     sourceComponent: Label {
-                        text: "(Wdh.)"
+                        text: qsTr("(Rpt.)")
                         color: Theme.secondaryHighlightColor
                         font.pixelSize: Theme.fontSizeExtraSmall
                     }
@@ -122,7 +122,7 @@ ListItem {
                     id: liveLabel
                     visible: scheduleDelegate.isLive
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "LIVE"
+                    text: qsTr("LIVE")
                     color: Theme.highlightColor
                     font.pixelSize: Theme.fontSizeExtraSmall
                     font.bold: true
