@@ -7,7 +7,6 @@ ListItem {
     property int recordingId: 0
     property string showName: ""
     property string subtitle: ""
-    property string dateStr: ""
     property string dayHeader: ""
     property var time: ""
     property string playbackUrl: ""

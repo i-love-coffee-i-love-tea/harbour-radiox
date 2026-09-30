@@ -16,9 +16,6 @@ public:
     void fetchShowDetail(const QString &slug);
     void fetchPlayerPage(const QUrl &url);
 
-    void setBaseUrl(const QString &url);
-    QString baseUrl() const;
-
 signals:
     void programWeekReceived(const QString &html);
     void recordingsReceived(const QString &html);
@@ -29,7 +26,6 @@ signals:
 
 private:
     QNetworkAccessManager *m_nam;
-    bool m_ownNam;
     QString m_baseUrl;
 };
 

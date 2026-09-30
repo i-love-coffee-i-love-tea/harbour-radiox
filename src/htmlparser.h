@@ -19,7 +19,6 @@ struct ScheduleSlot {
 
 struct ProgramDay {
     QString dayLabel;
-    QDate date;
     QList<ScheduleSlot> entries;
 };
 

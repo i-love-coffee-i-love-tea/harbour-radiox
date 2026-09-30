@@ -25,5 +25,4 @@ OTHER_FILES += \
     qml/harbour-radiox.qml \
     qml/pages/*.qml \
     qml/components/*.qml \
-    qml/cover/*.qml \
-    qml/js/*.js
+    qml/cover/*.qml

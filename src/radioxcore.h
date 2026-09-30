@@ -52,7 +52,6 @@ signals:
     void playbackStopped();
     void showDetailChanged();
     void loadingShowDetailChanged();
-    void error(const QString &message);
     void errorMessageChanged();
     void lastInfoChanged();
 

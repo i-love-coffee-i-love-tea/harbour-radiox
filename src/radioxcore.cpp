@@ -28,7 +28,6 @@ RadioXCore::RadioXCore(QObject *parent)
     connect(m_fetcher, &NetworkFetcher::networkError, this, [this](const QString &err) {
         m_errorMessage = err;
         emit errorMessageChanged();
-        emit error(err);
     });
 
     // Clear error when data arrives

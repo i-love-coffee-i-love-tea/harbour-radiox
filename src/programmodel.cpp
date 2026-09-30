@@ -1,7 +1,4 @@
 #include "programmodel.h"
-#include <QDebug>
-#include <QFile>
-#include <QTextStream>
 
 ProgramModel::ProgramModel(QObject *parent)
     : QAbstractListModel(parent)
@@ -77,37 +74,12 @@ QStringList ProgramModel::dayLabels() const
     return labels;
 }
 
-int ProgramModel::count() const
-{
-    if (m_days.isEmpty()) return 0;
-    return m_days.first().entries.count();
-}
-
 void ProgramModel::loadFromHtml(const QString &html)
 {
     beginResetModel();
     m_days = HtmlParser::parseProgramWeek(html, m_weekLabel);
     endResetModel();
     emit programChanged();
-
-    // File-based debug logging
-    QFile logFile("/tmp/harbour-radiox.log");
-    logFile.open(QIODevice::Append | QIODevice::Text);
-    QTextStream ts(&logFile);
-    ts << "ProgramModel::loadFromHtml\n";
-    ts << "  HTML size: " << html.size() << "\n";
-    ts << "  weekLabel: " << m_weekLabel << "\n";
-    ts << "  days: " << m_days.size() << "\n";
-    if (!m_days.isEmpty()) {
-        ts << "  day0 label: " << m_days.first().dayLabel << "\n";
-        ts << "  day0 entries: " << m_days.first().entries.count() << "\n";
-        if (!m_days.first().entries.isEmpty()) {
-            ts << "  day0 entry0: hour=" << m_days.first().entries.first().hour
-               << " show=" << m_days.first().entries.first().showName << "\n";
-        }
-    }
-    ts << "---\n";
-    logFile.close();
 }
 
 void ProgramModel::prevWeek()

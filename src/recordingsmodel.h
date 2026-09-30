@@ -23,7 +23,6 @@ public:
     void loadFromHtml(const QString &html);
 
 signals:
-    void playRequested(const QString &url);
     void recordingsChanged();
 
 private:

@@ -27,7 +27,7 @@ ListItem {
         Label {
             width: parent.width
             text: sendetippDelegate.title
-            color: sendetippDelegate.highlighted ? Theme.highlightColor : Theme.highlightColor
+            color: Theme.highlightColor
             font.pixelSize: Theme.fontSizeSmall
             font.bold: true
             wrapMode: Text.WordWrap

@@ -25,10 +25,9 @@ Page {
             recordingId: model.recordingId
             showName: model.showName
             subtitle: model.subtitle
-            dateStr: model.dayHeader
             time: model.time
             playbackUrl: model.playbackUrl
-            dayHeader: model.dayHeader ? model.dayHeader : ""
+            dayHeader: model.dayHeader || ""
         }
 
         VerticalScrollDecorator {}

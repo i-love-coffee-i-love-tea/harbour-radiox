@@ -8,22 +8,14 @@ ApplicationWindow {
     id: app
     _defaultPageOrientations: Orientation.All
 
-    property bool audioPlaying: audioPlayer.playbackState === Audio.PlayingState
-
     Audio {
         id: audioPlayer
         autoLoad: true
-        onError: {
-            console.warn("Audio error:", errorString, error)
-        }
-        onStatusChanged: console.log("Audio status:", status)
-        onPlaybackStateChanged: console.log("Audio playbackState:", playbackState)
     }
 
     Connections {
         target: radioXCore
         onPlaybackUrlChanged: {
-            console.log("Setting audio source:", url)
             audioPlayer.source = url
             audioPlayer.play()
         }
