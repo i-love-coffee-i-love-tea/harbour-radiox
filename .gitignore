@@ -10,5 +10,6 @@ debuglinks.list
 debugsourcefiles.list
 debugsources.list
 documentation.list
-elfbins.listtests/build/
+elfbins.list
+tests/build/
 .qmake.stash
