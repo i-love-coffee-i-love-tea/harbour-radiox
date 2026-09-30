@@ -3,3 +3,6 @@ rpms/
 .sfdk/
 .mimocode/
 tests/build/
+Makefile
+*.list
+.qmake.stash
