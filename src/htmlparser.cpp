@@ -3,6 +3,7 @@
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
 #include <QRegularExpression>
+#include <QTextDocument>
 
 // ---------------------------------------------------------------------------
 // libxml2 helpers
@@ -409,10 +410,69 @@ QList<Sendetipp> HtmlParser::parseSendetipps(const QString &html)
 }
 
 // ---------------------------------------------------------------------------
-// parseShowDetail – placeholder for future implementation
+// parseShowDetail
 // ---------------------------------------------------------------------------
+static QString htmlToPlainText(const QString &html)
+{
+    QTextDocument doc;
+    doc.setHtml(html);
+    QString text = doc.toPlainText();
+    text.replace(QRegularExpression(QStringLiteral("\n{3,}")), QStringLiteral("\n\n"));
+    return text.trimmed();
+}
+
 QVariantMap HtmlParser::parseShowDetail(const QString &html)
 {
-    Q_UNUSED(html);
-    return {};
+    QVariantMap result;
+
+    xmlDocPtr doc = parseHtml(html);
+    if (!doc) return result;
+
+    // Title
+    xmlXPathObjectPtr titleObj = xpathEval(doc, nullptr,
+        "//h1[@itemprop='name']");
+    if (titleObj && xpathNodeCount(titleObj) > 0) {
+        result[QStringLiteral("title")] = nodeText(xpathNode(titleObj, 0));
+        xmlXPathFreeObject(titleObj);
+    } else if (titleObj) {
+        xmlXPathFreeObject(titleObj);
+    }
+
+    // Article body
+    xmlXPathObjectPtr bodyObj = xpathEval(doc, nullptr,
+        "//div[@itemprop='articleBody']");
+    if (bodyObj && xpathNodeCount(bodyObj) > 0) {
+        xmlNodePtr bodyNode = xpathNode(bodyObj, 0);
+        // Get inner HTML by serializing child nodes
+        xmlBufferPtr buf = xmlBufferCreate();
+        for (xmlNodePtr child = bodyNode->children; child; child = child->next)
+            xmlNodeDump(buf, doc, child, 0, 0);
+        QString bodyHtml = QString::fromUtf8(
+            reinterpret_cast<const char*>(xmlBufferContent(buf)));
+        xmlBufferFree(buf);
+        result[QStringLiteral("description")] = htmlToPlainText(bodyHtml);
+        xmlXPathFreeObject(bodyObj);
+    } else if (bodyObj) {
+        xmlXPathFreeObject(bodyObj);
+    }
+
+    // Image
+    xmlXPathObjectPtr imgObj = xpathEval(doc, nullptr,
+        "//div[@itemprop='articleBody']//img/@src");
+    if (imgObj && xpathNodeCount(imgObj) > 0) {
+        xmlNodePtr srcNode = xpathNode(imgObj, 0);
+        if (srcNode->type == XML_ATTRIBUTE_NODE && srcNode->children) {
+            QString src = QString::fromUtf8(
+                reinterpret_cast<const char*>(srcNode->children->content));
+            if (!src.startsWith(QStringLiteral("http")))
+                src = QStringLiteral("https://www.radiox.de") + src;
+            result[QStringLiteral("imageUrl")] = src;
+        }
+        xmlXPathFreeObject(imgObj);
+    } else if (imgObj) {
+        xmlXPathFreeObject(imgObj);
+    }
+
+    xmlFreeDoc(doc);
+    return result;
 }

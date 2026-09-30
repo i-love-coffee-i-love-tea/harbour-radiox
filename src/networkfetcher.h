@@ -14,6 +14,7 @@ public:
     void fetchRecordings();
     void fetchSendetipps();
     void fetchShowDetail(const QString &slug);
+    void fetchPlayerPage(const QUrl &url);
 
     void setBaseUrl(const QString &url);
     QString baseUrl() const;
@@ -23,6 +24,7 @@ signals:
     void recordingsReceived(const QString &html);
     void sendetippsReceived(const QString &html);
     void showDetailReceived(const QString &html);
+    void playerPageReceived(const QString &audioUrl);
     void networkError(const QString &errorString);
 
 private:

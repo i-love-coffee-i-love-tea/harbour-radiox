@@ -69,6 +69,14 @@ QString ProgramModel::weekLabel() const
     return m_weekLabel;
 }
 
+QStringList ProgramModel::dayLabels() const
+{
+    QStringList labels;
+    for (const ProgramDay &pd : m_days)
+        labels << pd.dayLabel;
+    return labels;
+}
+
 int ProgramModel::count() const
 {
     if (m_days.isEmpty()) return 0;

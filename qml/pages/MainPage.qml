@@ -1,4 +1,5 @@
 import QtQuick 2.6
+import QtQuick.Layouts 1.1
 import QtMultimedia 5.0
 import Sailfish.Silica 1.0
 import "../components"
@@ -12,6 +13,7 @@ Page {
     }
     property int selectedDay: todayIndex
     property int currentHour: new Date().getHours()
+    property bool isRecording: radioXCore.playbackTitle.length > 0
 
     Timer {
         interval: 60000 // update every minute
@@ -22,7 +24,12 @@ Page {
 
     SilicaListView {
         id: listView
-        anchors.fill: parent
+        anchors {
+            top: parent.top
+            left: parent.left
+            right: parent.right
+            bottom: dayBar.top
+        }
         model: radioXCore.programModel
 
         PullDownMenu {
@@ -62,7 +69,13 @@ Page {
             Label {
                 width: parent.width - 2 * Theme.horizontalPageMargin
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: radioXCore.programModel.weekLabel
+                text: {
+                    var raw = radioXCore.programModel.weekLabel
+                    if (raw.length === 0) return ""
+                    var m = raw.match(/KW\s*(\d+)\s*\/\s*(\d+)/)
+                    if (m) return qsTr("Program schedule (Week %1, %2)").arg(m[1]).arg(m[2])
+                    return raw
+                }
                 visible: text.length > 0
                 color: Theme.highlightColor
                 font.pixelSize: Theme.fontSizeSmall
@@ -81,67 +94,143 @@ Page {
                 wrapMode: Text.WordWrap
             }
 
-            // Debug info
-            Label {
-                width: parent.width - 2 * Theme.horizontalPageMargin
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: radioXCore.lastInfo + " | rows: " + radioXCore.programModel.count
-                visible: radioXCore.lastInfo.length > 0
-                color: Theme.secondaryColor
-                font.pixelSize: Theme.fontSizeExtraSmall
-                horizontalAlignment: Text.AlignHCenter
+            Item {
+                width: parent.width
+                height: Theme.paddingLarge
             }
+
+
 
             // Playback indicator
             Rectangle {
                 width: parent.width
-                height: playbackRow.height + Theme.paddingSmall * 2
+                height: playbackColumn.height + Theme.paddingSmall * 2
                 visible: radioXCore.playbackUrl.length > 0
                 color: Theme.rgba(Theme.highlightBackgroundColor, 0.15)
 
-                Row {
-                    id: playbackRow
-                    anchors {
-                        left: parent.left
-                        leftMargin: Theme.horizontalPageMargin
-                        right: parent.right
-                        rightMargin: Theme.horizontalPageMargin
-                        verticalCenter: parent.verticalCenter
-                    }
-                    spacing: Theme.paddingMedium
+                Column {
+                    id: playbackColumn
+                    width: parent.width - 2 * Theme.horizontalPageMargin
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    spacing: Theme.paddingSmall
 
-                    Label {
-                        width: parent.width - playPauseBtn.width - stopBtn.width - Theme.paddingMedium * 2
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: audioPlayer.playbackState === Audio.PlayingState
-                              ? qsTr("radio x Live") + " \u2014 " + qsTr("Playing")
-                              : qsTr("radio x Live") + " \u2014 " + qsTr("Paused")
-                        color: Theme.highlightColor
-                        font.pixelSize: Theme.fontSizeSmall
-                        truncationMode: TruncationMode.Fade
-                    }
+                    RowLayout {
+                        width: parent.width
+                        spacing: Theme.paddingMedium
 
-                    IconButton {
-                        id: playPauseBtn
-                        anchors.verticalCenter: parent.verticalCenter
-                        icon.source: audioPlayer.playbackState === Audio.PlayingState
-                                     ? "image://theme/icon-m-pause"
-                                     : "image://theme/icon-m-play"
-                        onClicked: {
-                            if (audioPlayer.playbackState === Audio.PlayingState)
-                                audioPlayer.pause()
-                            else
-                                audioPlayer.play()
+                        Label {
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignVCenter
+                            text: {
+                                var state = audioPlayer.playbackState === Audio.PlayingState
+                                            ? qsTr("Playing") : qsTr("Paused")
+                                if (mainPage.isRecording) {
+                                    var title = radioXCore.playbackTitle
+                                    return (title.length > 0 ? title : qsTr("Recording"))
+                                           + " \u2014 " + state
+                                }
+                                return qsTr("radio x Live") + " \u2014 " + state
+                            }
+                            color: Theme.highlightColor
+                            font.pixelSize: Theme.fontSizeSmall
+                            truncationMode: TruncationMode.Fade
+                        }
+
+                        Item {
+                            Layout.preferredWidth: Theme.itemSizeSmall
+                            Layout.preferredHeight: Theme.itemSizeSmall
+                            Layout.alignment: Qt.AlignVCenter
+                            visible: mainPage.isRecording
+
+                            MouseArea {
+                                id: playPauseBtn
+                                anchors.fill: parent
+                                onClicked: {
+                                    if (audioPlayer.playbackState === Audio.PlayingState)
+                                        audioPlayer.pause()
+                                    else
+                                        audioPlayer.play()
+                                }
+                                Image {
+                                    anchors.centerIn: parent
+                                    width: Theme.iconSizeMedium
+                                    height: Theme.iconSizeMedium
+                                    source: audioPlayer.playbackState === Audio.PlayingState
+                                            ? "image://theme/icon-m-pause"
+                                            : "image://theme/icon-m-play"
+                                    opacity: parent.pressed ? 0.4 : 1.0
+                                }
+                            }
+                        }
+
+                        Item {
+                            Layout.preferredWidth: Theme.itemSizeSmall
+                            Layout.preferredHeight: Theme.itemSizeSmall
+                            Layout.alignment: Qt.AlignVCenter
+
+                            MouseArea {
+                                id: stopBtn
+                                anchors.fill: parent
+                                onClicked: radioXCore.stopPlayback()
+                                Image {
+                                    anchors.centerIn: parent
+                                    width: Theme.iconSizeMedium
+                                    height: Theme.iconSizeMedium
+                                    source: "image://theme/icon-m-stop"
+                                    opacity: parent.pressed ? 0.4 : 1.0
+                                }
+                            }
                         }
                     }
 
-                    IconButton {
-                        id: stopBtn
-                        anchors.verticalCenter: parent.verticalCenter
-                        icon.source: "image://theme/icon-m-stop"
-                        onClicked: radioXCore.stopPlayback()
+                    // Position bar for recordings
+                    Row {
+                        width: parent.width
+                        visible: mainPage.isRecording
+                        spacing: Theme.paddingSmall
+
+                        Label {
+                            id: positionLabel
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: formatTime(audioPlayer.position)
+                            color: Theme.secondaryColor
+                            font.pixelSize: Theme.fontSizeExtraSmall
+                        }
+
+                        Slider {
+                            id: positionSlider
+                            width: parent.width - positionLabel.width - durationLabel.width - Theme.paddingSmall * 2
+                            anchors.verticalCenter: parent.verticalCenter
+                            minimumValue: 0
+                            maximumValue: audioPlayer.duration
+                            value: audioPlayer.position
+                            stepSize: 1000
+                            onReleased: audioPlayer.seek(value)
+
+                            Binding on value {
+                                when: !positionSlider.pressed
+                                value: audioPlayer.position
+                            }
+                        }
+
+                        Label {
+                            id: durationLabel
+                            anchors.verticalCenter: parent.verticalCenter
+                            text: formatTime(audioPlayer.duration)
+                            color: Theme.secondaryColor
+                            font.pixelSize: Theme.fontSizeExtraSmall
+                        }
                     }
                 }
+            }
+
+            function formatTime(ms) {
+                var totalSec = Math.floor(ms / 1000)
+                var h = Math.floor(totalSec / 3600)
+                var m = Math.floor((totalSec % 3600) / 60)
+                var s = totalSec % 60
+                var pad = function(n) { return n < 10 ? "0" + n : "" + n }
+                return h > 0 ? h + ":" + pad(m) + ":" + pad(s) : m + ":" + pad(s)
             }
 
             // Empty state
@@ -156,80 +245,105 @@ Page {
                 wrapMode: Text.WordWrap
             }
 
-            Item {
-                width: parent.width
-                height: dayRow.height + Theme.paddingSmall
-                visible: listView.count > 0
 
-                Row {
-                    id: dayRow
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    spacing: Theme.paddingSmall
+        }
 
-                    Repeater {
-                        model: [qsTr("Mo"), qsTr("Di"), qsTr("Mi"), qsTr("Do"), qsTr("Fr"), qsTr("Sa"), qsTr("So")]
+        delegate: ScheduleDelegate {
+            property var dayData: model['day' + mainPage.selectedDay]
+            showName: dayData ? dayData.showName : ""
+            slug: dayData ? dayData.slug : ""
+            subtitle: dayData ? dayData.subtitle : ""
+            isDito: dayData ? dayData.isDito : false
+            isRepeat: dayData ? dayData.isRepeat : false
+            hour: model.hour
+            isLive: mainPage.selectedDay === mainPage.todayIndex
+                     && model.hour === mainPage.currentHour
+                     && !dayData.isDito
+            continuesFromAbove: {
+                if (index <= 0 || !dayData || dayData.isDito) return false
+                var prevItem = listView.itemAtIndex(index - 1)
+                if (!prevItem || !prevItem.dayData) return false
+                return prevItem.dayData.showName === dayData.showName
+                       && !prevItem.dayData.isDito
+            }
+        }
 
-                        delegate: Item {
-                            width: Math.max(dayLabel.implicitWidth + Theme.paddingMedium * 2, 60)
-                            height: dayLabel.implicitHeight + Theme.paddingSmall * 2
+        VerticalScrollDecorator {}
+    }
 
-                            Rectangle {
-                                anchors.fill: parent
-                                radius: 4
-                                color: mainPage.selectedDay === index
-                                       ? Theme.highlightColor
-                                       : "transparent"
-                                opacity: mainPage.selectedDay === index ? 0.3 : 0
-                            }
+    Rectangle {
+        id: dayBar
+        width: parent.width
+        height: dayRow.height + Theme.paddingMedium * 2
+        anchors.bottom: parent.bottom
+        color: Theme.rgba(Theme.highlightBackgroundColor, 0.06)
 
-                            Label {
-                                id: dayLabel
-                                anchors.centerIn: parent
-                                text: modelData
-                                color: mainPage.selectedDay === index
-                                       ? Theme.highlightColor
-                                       : Theme.primaryColor
-                                font.pixelSize: Theme.fontSizeSmall
-                                font.bold: mainPage.selectedDay === index
-                            }
+        Row {
+            id: dayRow
+            anchors.centerIn: parent
+            spacing: Theme.paddingSmall
 
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: mainPage.selectedDay = index
-                            }
+            Repeater {
+                model: radioXCore.programModel.dayLabels.length >= 7
+                       ? radioXCore.programModel.dayLabels
+                       : [qsTr("Mo"), qsTr("Di"), qsTr("Mi"), qsTr("Do"), qsTr("Fr"), qsTr("Sa"), qsTr("So")]
+
+                delegate: Item {
+                    property string rawLabel: modelData
+                    property string dayName: rawLabel.replace(/\s*\d{2}\.\d{2}\.?\s*/, "")
+                    property string dateStr: {
+                        var m = rawLabel.match(/(\d{2}\.\d{2})\.?/)
+                        return m ? m[1] : ""
+                    }
+
+                    width: Math.max(dayCol.implicitWidth + Theme.paddingMedium * 2, 48)
+                    height: dayCol.implicitHeight + Theme.paddingMedium * 2
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.paddingSmall
+                        color: mainPage.selectedDay === index
+                               ? Theme.rgba(Theme.highlightColor, 0.2)
+                               : (dayMouse.pressed
+                                  ? Theme.rgba(Theme.highlightBackgroundColor, 0.15)
+                                  : "transparent")
+                        border.width: mainPage.selectedDay === index ? 1 : 0
+                        border.color: Theme.rgba(Theme.highlightColor, 0.4)
+                    }
+
+                    Column {
+                        id: dayCol
+                        anchors.centerIn: parent
+                        spacing: 2
+
+                        Label {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: dayName
+                            color: mainPage.selectedDay === index
+                                   ? Theme.highlightColor
+                                   : Theme.primaryColor
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.bold: mainPage.selectedDay === index
                         }
+
+                        Label {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            visible: dateStr.length > 0
+                            text: dateStr
+                            color: mainPage.selectedDay === index
+                                   ? Theme.highlightColor
+                                   : Theme.secondaryColor
+                            font.pixelSize: Theme.fontSizeTiny
+                        }
+                    }
+
+                    MouseArea {
+                        id: dayMouse
+                        anchors.fill: parent
+                        onClicked: mainPage.selectedDay = index
                     }
                 }
             }
         }
-
-        delegate: ScheduleDelegate {
-            showName: {
-                var dayData = model['day' + mainPage.selectedDay]
-                return dayData ? dayData.showName : ""
-            }
-            slug: {
-                var dayData = model['day' + mainPage.selectedDay]
-                return dayData ? dayData.slug : ""
-            }
-            subtitle: {
-                var dayData = model['day' + mainPage.selectedDay]
-                return dayData ? dayData.subtitle : ""
-            }
-            isDito: {
-                var dayData = model['day' + mainPage.selectedDay]
-                return dayData ? dayData.isDito : false
-            }
-            isRepeat: {
-                var dayData = model['day' + mainPage.selectedDay]
-                return dayData ? dayData.isRepeat : false
-            }
-            hour: model.hour
-            isLive: mainPage.selectedDay === mainPage.todayIndex
-                     && model.hour === mainPage.currentHour
-                     && !model['day' + mainPage.selectedDay].isDito
-        }
-
-        VerticalScrollDecorator {}
     }
 }

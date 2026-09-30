@@ -14,6 +14,17 @@ RadioXCore::RadioXCore(QObject *parent)
             m_recordingsModel, &RecordingsModel::loadFromHtml);
     connect(m_fetcher, &NetworkFetcher::sendetippsReceived,
             m_sendetippsModel, &SendetippsModel::loadFromHtml);
+    connect(m_fetcher, &NetworkFetcher::playerPageReceived, this, [this](const QString &audioUrl) {
+        m_playbackUrl = audioUrl;
+        emit playbackUrlChanged(m_playbackUrl);
+        emit playbackStarted();
+    });
+    connect(m_fetcher, &NetworkFetcher::showDetailReceived, this, [this](const QString &html) {
+        m_showDetail = HtmlParser::parseShowDetail(html);
+        m_loadingShowDetail = false;
+        emit showDetailChanged();
+        emit loadingShowDetailChanged();
+    });
     connect(m_fetcher, &NetworkFetcher::networkError, this, [this](const QString &err) {
         m_errorMessage = err;
         emit errorMessageChanged();
@@ -78,15 +89,25 @@ void RadioXCore::refresh()
     m_fetcher->fetchSendetipps();
 }
 
-void RadioXCore::playRecording(int id)
+void RadioXCore::fetchShowDetail(const QString &slug)
 {
-    m_playbackUrl = QStringLiteral("https://www.radiox.de/plus7/ajax/player/%1").arg(id);
-    emit playbackUrlChanged(m_playbackUrl);
-    emit playbackStarted();
+    m_loadingShowDetail = true;
+    emit loadingShowDetailChanged();
+    m_fetcher->fetchShowDetail(slug);
+}
+
+void RadioXCore::playRecording(int id, const QString &title)
+{
+    m_playbackTitle = title;
+    emit playbackTitleChanged();
+    QUrl url(QStringLiteral("https://www.radiox.de/plus7/ajax/player/%1").arg(id));
+    m_fetcher->fetchPlayerPage(url);
 }
 
 void RadioXCore::openLivestream()
 {
+    m_playbackTitle.clear();
+    emit playbackTitleChanged();
     m_playbackUrl = livestreamUrl();
     emit playbackUrlChanged(m_playbackUrl);
     emit playbackStarted();
@@ -97,9 +118,31 @@ QString RadioXCore::playbackUrl() const
     return m_playbackUrl;
 }
 
+QString RadioXCore::playbackTitle() const
+{
+    return m_playbackTitle;
+}
+
+bool RadioXCore::livestreamPlaying() const
+{
+    return !m_playbackUrl.isEmpty() && m_playbackUrl == livestreamUrl();
+}
+
+QVariantMap RadioXCore::showDetail() const
+{
+    return m_showDetail;
+}
+
+bool RadioXCore::loadingShowDetail() const
+{
+    return m_loadingShowDetail;
+}
+
 void RadioXCore::stopPlayback()
 {
     m_playbackUrl.clear();
+    m_playbackTitle.clear();
+    emit playbackTitleChanged();
     emit playbackUrlChanged(m_playbackUrl);
     emit playbackStopped();
 }

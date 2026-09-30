@@ -7,9 +7,18 @@ Page {
     property string slug: ""
     property string showName: ""
 
+    Component.onCompleted: radioXCore.fetchShowDetail(slug)
+
     SilicaFlickable {
         anchors.fill: parent
-        contentHeight: column.height
+        contentHeight: column.height + Theme.paddingLarge
+
+        PullDownMenu {
+            MenuItem {
+                text: qsTr("View on radiox.de")
+                onClicked: Qt.openUrlExternally("https://www.radiox.de/sendungen/" + showDetailPage.slug)
+            }
+        }
 
         Column {
             id: column
@@ -17,30 +26,52 @@ Page {
             spacing: Theme.paddingLarge
 
             PageHeader {
-                title: showDetailPage.showName.length > 0
-                       ? showDetailPage.showName
-                       : qsTr("Show Details")
+                title: radioXCore.showDetail.title || showDetailPage.showName || qsTr("Show Details")
+            }
+
+            BusyIndicator {
+                anchors.horizontalCenter: parent.horizontalCenter
+                size: BusyIndicatorSize.Medium
+                running: radioXCore.loadingShowDetail
+                visible: running
+            }
+
+            Image {
+                id: showImage
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                height: implicitHeight > 0 ? width * (implicitHeight / implicitWidth) : 0
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: status === Image.Ready
+                source: radioXCore.showDetail.imageUrl || ""
+                fillMode: Image.Stretch
+                autoTransform: true
+                asynchronous: true
             }
 
             Label {
                 width: parent.width - 2 * Theme.horizontalPageMargin
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: qsTr("Slug: ") + showDetailPage.slug
-                color: Theme.secondaryColor
+                visible: text.length > 0
+                text: radioXCore.showDetail.description || ""
+                color: Theme.primaryColor
                 font.pixelSize: Theme.fontSizeSmall
                 wrapMode: Text.WordWrap
+                lineHeight: 1.15
             }
 
-            BackgroundItem {
-                width: parent.width
-                Label {
-                    anchors.centerIn: parent
-                    text: qsTr("View on radiox.de")
-                    color: parent.highlighted ? Theme.highlightColor : Theme.highlightColor
-                    font.underline: true
-                }
-                onClicked: Qt.openUrlExternally("https://www.radiox.de/sendeplan/" + showDetailPage.slug)
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: !radioXCore.loadingShowDetail
+                         && (radioXCore.showDetail.description || "").length === 0
+                text: qsTr("No details available for this show.")
+                color: Theme.secondaryColor
+                font.pixelSize: Theme.fontSizeSmall
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
             }
         }
+
+        VerticalScrollDecorator {}
     }
 }

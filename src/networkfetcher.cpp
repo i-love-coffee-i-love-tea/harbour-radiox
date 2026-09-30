@@ -3,6 +3,7 @@
 #include <QNetworkRequest>
 #include <QFile>
 #include <QTextStream>
+#include <QRegularExpression>
 #include <functional>
 
 NetworkFetcher::NetworkFetcher(QObject *parent, QNetworkAccessManager *nam)
@@ -84,5 +85,32 @@ void NetworkFetcher::fetchShowDetail(const QString &slug)
     QUrl url(m_baseUrl + QStringLiteral("/sendungen/%1").arg(slug));
     getAndEmit(m_nam, url, this,
         [this](const QString &html) { emit showDetailReceived(html); },
+        [this](const QString &err) { emit networkError(err); });
+}
+
+void NetworkFetcher::fetchPlayerPage(const QUrl &url)
+{
+    getAndEmit(m_nam, url, this,
+        [this](const QString &html) {
+            // Try <audio src="..."> or <source src="...">
+            static QRegularExpression srcRe(
+                QStringLiteral("<(?:audio|source)[^>]+src=[\"']([^\"']+)[\"']"),
+                QRegularExpression::CaseInsensitiveOption);
+            QRegularExpressionMatch m = srcRe.match(html);
+            if (m.hasMatch()) {
+                emit playerPageReceived(m.captured(1));
+                return;
+            }
+            // Try any URL that looks like an audio stream
+            static QRegularExpression audioRe(
+                QStringLiteral("(https?://[^\\s\"'<>]+\\.(?:mp3|ogg|m4a|aac|opus|oga))"),
+                QRegularExpression::CaseInsensitiveOption);
+            m = audioRe.match(html);
+            if (m.hasMatch()) {
+                emit playerPageReceived(m.captured(1));
+                return;
+            }
+            emit networkError(QStringLiteral("Could not find audio URL in player page"));
+        },
         [this](const QString &err) { emit networkError(err); });
 }

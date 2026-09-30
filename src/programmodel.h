@@ -9,6 +9,7 @@ class ProgramModel : public QAbstractListModel
     Q_OBJECT
     Q_PROPERTY(int weekOffset READ weekOffset NOTIFY weekOffsetChanged)
     Q_PROPERTY(QString weekLabel READ weekLabel NOTIFY programChanged)
+    Q_PROPERTY(QStringList dayLabels READ dayLabels NOTIFY programChanged)
     Q_PROPERTY(int count READ count NOTIFY programChanged)
 public:
     enum Roles {
@@ -25,6 +26,7 @@ public:
 
     int weekOffset() const;
     QString weekLabel() const;
+    QStringList dayLabels() const;
     int count() const;
 
     void loadFromHtml(const QString &html);

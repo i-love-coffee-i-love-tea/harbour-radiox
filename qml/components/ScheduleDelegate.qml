@@ -11,8 +11,9 @@ ListItem {
     property bool isRepeat: false
     property bool isDito: false
     property bool isLive: false
+    property bool continuesFromAbove: false
 
-    contentHeight: contentRow.height + Theme.paddingSmall
+    contentHeight: contentRow.height + Theme.paddingMedium
 
     // Live highlight background
     Rectangle {
@@ -32,6 +33,18 @@ ListItem {
         }
         color: Theme.highlightColor
         visible: scheduleDelegate.isLive
+    }
+
+    // Connector line for multi-hour shows
+    Rectangle {
+        width: 3
+        anchors {
+            top: parent.top
+            topMargin: 0
+        }
+        height: Theme.paddingMedium
+        color: Theme.rgba(Theme.highlightColor, 0.25)
+        visible: scheduleDelegate.continuesFromAbove
     }
 
     Row {
@@ -58,10 +71,19 @@ ListItem {
             horizontalAlignment: Text.AlignRight
         }
 
+        // Thin vertical separator
+        Rectangle {
+            width: 1
+            height: contentColumn.height
+            anchors.verticalCenter: parent.verticalCenter
+            color: Theme.rgba(Theme.primaryColor, 0.1)
+        }
+
         // Show info column
         Column {
-            width: parent.width - 50 - Theme.paddingMedium
-            spacing: Theme.paddingSmall
+            id: contentColumn
+            width: parent.width - 50 - 1 - Theme.paddingMedium * 3
+            spacing: Theme.paddingExtraSmall
 
             Row {
                 spacing: Theme.paddingSmall
@@ -69,7 +91,8 @@ ListItem {
 
                 Label {
                     id: nameLabel
-                    width: parent.width - badgeLoader.width - Theme.paddingSmall - (scheduleDelegate.isLive ? liveLabel.width + Theme.paddingSmall : 0)
+                    width: parent.width - badgeLoader.width - Theme.paddingSmall
+                           - (scheduleDelegate.isLive ? liveLabel.width + livePlayBtn.width + Theme.paddingSmall * 2 : 0)
                     anchors.verticalCenter: parent.verticalCenter
                     text: scheduleDelegate.showName
                     color: scheduleDelegate.isLive
@@ -103,6 +126,33 @@ ListItem {
                     font.pixelSize: Theme.fontSizeExtraSmall
                     font.bold: true
                 }
+
+                Item {
+                    id: livePlayBtn
+                    visible: scheduleDelegate.isLive
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: Theme.itemSizeSmall
+                    height: Theme.itemSizeSmall
+
+                    MouseArea {
+                        anchors.fill: parent
+                        onClicked: {
+                            if (radioXCore.livestreamPlaying)
+                                radioXCore.stopPlayback()
+                            else
+                                radioXCore.openLivestream()
+                        }
+                        Image {
+                            anchors.centerIn: parent
+                            width: Theme.iconSizeMedium
+                            height: Theme.iconSizeMedium
+                            source: radioXCore.livestreamPlaying
+                                    ? "image://theme/icon-m-stop"
+                                    : "image://theme/icon-m-play"
+                            opacity: parent.pressed ? 0.4 : 1.0
+                        }
+                    }
+                }
             }
 
             Label {
@@ -115,6 +165,19 @@ ListItem {
                 opacity: scheduleDelegate.isDito ? 0.5 : 0.8
             }
         }
+    }
+
+    // Bottom separator
+    Rectangle {
+        anchors {
+            left: parent.left
+            leftMargin: Theme.horizontalPageMargin
+            right: parent.right
+            rightMargin: Theme.horizontalPageMargin
+            bottom: parent.bottom
+        }
+        height: 1
+        color: Theme.rgba(Theme.primaryColor, 0.05)
     }
 
     onClicked: {

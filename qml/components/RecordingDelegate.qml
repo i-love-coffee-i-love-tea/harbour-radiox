@@ -90,7 +90,7 @@ ListItem {
             anchors.verticalCenter: parent.verticalCenter
             icon.source: "image://theme/icon-m-play"
             onClicked: {
-                radioXCore.playRecording(recordingDelegate.recordingId)
+                radioXCore.playRecording(recordingDelegate.recordingId, recordingDelegate.showName)
             }
         }
     }
