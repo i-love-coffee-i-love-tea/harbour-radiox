@@ -40,7 +40,7 @@ for ARCH in $ARCHES; do
     done
 
     cd "$BUILD_DIR"
-    sfdk -c target="$TARGET" build "$SCRIPT_DIR"
+    sfdk -c target="$TARGET" -c no-fix-version build "$SCRIPT_DIR"
 
     if ls "$BUILD_DIR"/RPMS/*.rpm >/dev/null 2>&1; then
         cp "$BUILD_DIR"/RPMS/*.rpm "$SCRIPT_DIR/rpms/"
