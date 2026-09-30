@@ -66,41 +66,6 @@ Page {
                 title: qsTr("radio x")
             }
 
-            Label {
-                width: parent.width - 2 * Theme.horizontalPageMargin
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: {
-                    var raw = radioXCore.programModel.weekLabel
-                    if (raw.length === 0) return ""
-                    var m = raw.match(/KW\s*(\d+)\s*\/\s*(\d+)/)
-                    if (m) return qsTr("Program schedule (Week %1, %2)").arg(m[1]).arg(m[2])
-                    return raw
-                }
-                visible: text.length > 0
-                color: Theme.highlightColor
-                font.pixelSize: Theme.fontSizeSmall
-                horizontalAlignment: Text.AlignHCenter
-            }
-
-            // Error banner
-            Label {
-                width: parent.width - 2 * Theme.horizontalPageMargin
-                anchors.horizontalCenter: parent.horizontalCenter
-                text: radioXCore.errorMessage
-                visible: text.length > 0
-                color: Theme.errorColor
-                font.pixelSize: Theme.fontSizeSmall
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.WordWrap
-            }
-
-            Item {
-                width: parent.width
-                height: Theme.paddingLarge
-            }
-
-
-
             // Playback indicator
             Rectangle {
                 width: parent.width
@@ -222,6 +187,39 @@ Page {
                         }
                     }
                 }
+            }
+
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: {
+                    var raw = radioXCore.programModel.weekLabel
+                    if (raw.length === 0) return ""
+                    var m = raw.match(/KW\s*(\d+)\s*\/\s*(\d+)/)
+                    if (m) return qsTr("Program schedule (Week %1, %2)").arg(m[1]).arg(m[2])
+                    return raw
+                }
+                visible: text.length > 0
+                color: Theme.highlightColor
+                font.pixelSize: Theme.fontSizeSmall
+                horizontalAlignment: Text.AlignHCenter
+            }
+
+            // Error banner
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: radioXCore.errorMessage
+                visible: text.length > 0
+                color: Theme.errorColor
+                font.pixelSize: Theme.fontSizeSmall
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+            }
+
+            Item {
+                width: parent.width
+                height: Theme.paddingLarge
             }
 
             function formatTime(ms) {
