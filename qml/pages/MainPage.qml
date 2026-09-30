@@ -13,6 +13,10 @@ Page {
     }
     property int selectedDay: todayIndex
     property int currentHour: new Date().getHours()
+    property int liveHour: {
+        var _ = radioXCore.programModel.weekLabel // re-evaluate when data loads
+        return radioXCore.programModel.liveHourForDay(mainPage.todayIndex, mainPage.currentHour)
+    }
     property bool isRecording: radioXCore.playbackTitle.length > 0
 
     Timer {
@@ -259,14 +263,18 @@ Page {
                 isRepeat: dayData ? dayData.isRepeat : false
                 hour: model.hour
                 isLive: dayList.dayIndex === mainPage.todayIndex
-                         && model.hour === mainPage.currentHour
-                         && !dayData.isDito
+                         && model.hour === mainPage.liveHour
                 continuesFromAbove: {
                     if (index <= 0 || !dayData || dayData.isDito) return false
                     var prevItem = dayList.itemAtIndex(index - 1)
                     if (!prevItem || !prevItem.dayData) return false
                     return prevItem.dayData.showName === dayData.showName
                            && !prevItem.dayData.isDito
+                }
+                nextIsDito: {
+                    var nextItem = dayList.itemAtIndex(index + 1)
+                    if (!nextItem || !nextItem.dayData) return false
+                    return nextItem.dayData.isDito
                 }
             }
 

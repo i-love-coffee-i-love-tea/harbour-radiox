@@ -82,6 +82,20 @@ void ProgramModel::loadFromHtml(const QString &html)
     emit programChanged();
 }
 
+int ProgramModel::liveHourForDay(int dayIndex, int currentHour) const
+{
+    if (dayIndex < 0 || dayIndex >= m_days.size())
+        return -1;
+    const auto &entries = m_days[dayIndex].entries;
+    for (int i = entries.size() - 1; i >= 0; --i) {
+        if (entries[i].hour > currentHour)
+            continue;
+        if (!entries[i].isDito)
+            return entries[i].hour;
+    }
+    return -1;
+}
+
 void ProgramModel::prevWeek()
 {
     m_weekOffset--;

@@ -12,6 +12,7 @@ ListItem {
     property bool isDito: false
     property bool isLive: false
     property bool continuesFromAbove: false
+    property bool nextIsDito: false
 
     contentHeight: contentRow.height + Theme.paddingMedium
 
@@ -177,6 +178,7 @@ ListItem {
             bottom: parent.bottom
         }
         height: 1
+        visible: !scheduleDelegate.nextIsDito
         color: Theme.rgba(Theme.primaryColor, 0.05)
     }
 

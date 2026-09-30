@@ -28,6 +28,8 @@ public:
     QStringList dayLabels() const;
     void loadFromHtml(const QString &html);
 
+    Q_INVOKABLE int liveHourForDay(int dayIndex, int currentHour) const;
+
 public slots:
     void prevWeek();
     void nextWeek();
