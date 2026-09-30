@@ -10,8 +10,29 @@ ListItem {
     property string subtitle: ""
     property bool isRepeat: false
     property bool isDito: false
+    property bool isLive: false
 
     contentHeight: contentRow.height + Theme.paddingSmall
+
+    // Live highlight background
+    Rectangle {
+        anchors.fill: parent
+        visible: scheduleDelegate.isLive
+        color: Theme.rgba(Theme.highlightBackgroundColor, 0.1)
+    }
+
+    // Live indicator bar on left
+    Rectangle {
+        width: 3
+        anchors {
+            top: parent.top
+            bottom: parent.bottom
+            topMargin: Theme.paddingExtraSmall
+            bottomMargin: Theme.paddingExtraSmall
+        }
+        color: Theme.highlightColor
+        visible: scheduleDelegate.isLive
+    }
 
     Row {
         id: contentRow
@@ -48,26 +69,39 @@ ListItem {
 
                 Label {
                     id: nameLabel
-                    width: parent.width - badgeLoader.width - Theme.paddingSmall
+                    width: parent.width - badgeLoader.width - Theme.paddingSmall - (scheduleDelegate.isLive ? liveLabel.width + Theme.paddingSmall : 0)
                     anchors.verticalCenter: parent.verticalCenter
                     text: scheduleDelegate.showName
-                    color: scheduleDelegate.isDito
-                           ? Theme.secondaryColor
-                           : (scheduleDelegate.highlighted ? Theme.highlightColor : Theme.primaryColor)
+                    color: scheduleDelegate.isLive
+                           ? Theme.highlightColor
+                           : (scheduleDelegate.isDito
+                              ? Theme.secondaryColor
+                              : (scheduleDelegate.highlighted ? Theme.highlightColor : Theme.primaryColor))
                     font.pixelSize: Theme.fontSizeSmall
+                    font.bold: scheduleDelegate.isLive
                     truncationMode: TruncationMode.Fade
                     opacity: scheduleDelegate.isDito ? 0.6 : 1.0
                 }
 
                 Loader {
                     id: badgeLoader
-                    active: scheduleDelegate.isRepeat
+                    active: scheduleDelegate.isRepeat && !scheduleDelegate.isLive
                     anchors.verticalCenter: parent.verticalCenter
                     sourceComponent: Label {
                         text: "(Wdh.)"
                         color: Theme.secondaryHighlightColor
                         font.pixelSize: Theme.fontSizeExtraSmall
                     }
+                }
+
+                Label {
+                    id: liveLabel
+                    visible: scheduleDelegate.isLive
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "LIVE"
+                    color: Theme.highlightColor
+                    font.pixelSize: Theme.fontSizeExtraSmall
+                    font.bold: true
                 }
             }
 

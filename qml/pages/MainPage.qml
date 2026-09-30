@@ -1,13 +1,23 @@
 import QtQuick 2.6
+import QtMultimedia 5.0
 import Sailfish.Silica 1.0
 import "../components"
 
 Page {
     id: mainPage
 
-    property int selectedDay: {
+    property int todayIndex: {
         var d = new Date().getDay()
-        return d === 0 ? 6 : d - 1 // JS: 0=Sun → index 6, 1=Mon → 0
+        return d === 0 ? 6 : d - 1
+    }
+    property int selectedDay: todayIndex
+    property int currentHour: new Date().getHours()
+
+    Timer {
+        interval: 60000 // update every minute
+        running: true
+        repeat: true
+        onTriggered: mainPage.currentHour = new Date().getHours()
     }
 
     SilicaListView {
@@ -80,6 +90,58 @@ Page {
                 color: Theme.secondaryColor
                 font.pixelSize: Theme.fontSizeExtraSmall
                 horizontalAlignment: Text.AlignHCenter
+            }
+
+            // Playback indicator
+            Rectangle {
+                width: parent.width
+                height: playbackRow.height + Theme.paddingSmall * 2
+                visible: radioXCore.playbackUrl.length > 0
+                color: Theme.rgba(Theme.highlightBackgroundColor, 0.15)
+
+                Row {
+                    id: playbackRow
+                    anchors {
+                        left: parent.left
+                        leftMargin: Theme.horizontalPageMargin
+                        right: parent.right
+                        rightMargin: Theme.horizontalPageMargin
+                        verticalCenter: parent.verticalCenter
+                    }
+                    spacing: Theme.paddingMedium
+
+                    Label {
+                        width: parent.width - playPauseBtn.width - stopBtn.width - Theme.paddingMedium * 2
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: audioPlayer.playbackState === Audio.PlayingState
+                              ? qsTr("radio x Live") + " \u2014 " + qsTr("Playing")
+                              : qsTr("radio x Live") + " \u2014 " + qsTr("Paused")
+                        color: Theme.highlightColor
+                        font.pixelSize: Theme.fontSizeSmall
+                        truncationMode: TruncationMode.Fade
+                    }
+
+                    IconButton {
+                        id: playPauseBtn
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon.source: audioPlayer.playbackState === Audio.PlayingState
+                                     ? "image://theme/icon-m-pause"
+                                     : "image://theme/icon-m-play"
+                        onClicked: {
+                            if (audioPlayer.playbackState === Audio.PlayingState)
+                                audioPlayer.pause()
+                            else
+                                audioPlayer.play()
+                        }
+                    }
+
+                    IconButton {
+                        id: stopBtn
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon.source: "image://theme/icon-m-stop"
+                        onClicked: radioXCore.stopPlayback()
+                    }
+                }
             }
 
             // Empty state
@@ -163,6 +225,9 @@ Page {
                 return dayData ? dayData.isRepeat : false
             }
             hour: model.hour
+            isLive: mainPage.selectedDay === mainPage.todayIndex
+                     && model.hour === mainPage.currentHour
+                     && !model['day' + mainPage.selectedDay].isDito
         }
 
         VerticalScrollDecorator {}

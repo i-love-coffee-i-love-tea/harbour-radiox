@@ -54,7 +54,7 @@ bool RadioXCore::loading() const { return m_loading; }
 
 QString RadioXCore::livestreamUrl() const
 {
-    return QStringLiteral("https://stream.radiox.de/live.ogg");
+    return QStringLiteral("http://stream.radiox.de:8000/live");
 }
 
 QString RadioXCore::errorMessage() const
@@ -100,5 +100,6 @@ QString RadioXCore::playbackUrl() const
 void RadioXCore::stopPlayback()
 {
     m_playbackUrl.clear();
+    emit playbackUrlChanged(m_playbackUrl);
     emit playbackStopped();
 }

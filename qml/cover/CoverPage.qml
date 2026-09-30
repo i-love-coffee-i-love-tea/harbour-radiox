@@ -1,4 +1,5 @@
 import QtQuick 2.6
+import QtMultimedia 5.0
 import Sailfish.Silica 1.0
 
 CoverBackground {
@@ -41,7 +42,10 @@ CoverBackground {
                         : "image://theme/icon-cover-play"
             onTriggered: {
                 if (radioXCore.playbackUrl.length > 0) {
-                    radioXCore.stopPlayback()
+                    if (audioPlayer.playbackState === Audio.PlayingState)
+                        audioPlayer.pause()
+                    else
+                        audioPlayer.play()
                 } else {
                     radioXCore.openLivestream()
                 }
