@@ -56,7 +56,7 @@ Browse the schedule, listen to recordings, and tune into the livestream.</transl
     <message>
         <location filename="../qml/pages/MainPage.qml" line="66"/>
         <source>Sendetipps</source>
-        <translation>Sendetipps</translation>
+        <translation>Broadcast Tips</translation>
     </message>
     <message>
         <location filename="../qml/pages/MainPage.qml" line="70"/>
@@ -180,7 +180,7 @@ Browse the schedule, listen to recordings, and tune into the livestream.</transl
     <message>
         <location filename="../qml/pages/SendetippsPage.qml" line="21"/>
         <source>Sendetipps</source>
-        <translation>Sendetipps</translation>
+        <translation>Broadcast Tips</translation>
     </message>
 </context>
 <context>

@@ -1,6 +1,6 @@
 Name:       harbour-radiox
 Summary:    radio x — Frankfurter Stadtradio schedule, recordings and livestream
-Version:    0.1.0
+Version:    1.0.0
 Release:    1
 Group:      Utility
 License:    MIT
