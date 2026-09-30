@@ -1,16 +1,5 @@
-Makefile
-*.o
-moc_*.cpp
-harbour-radiox
 build/
 rpms/
 .sfdk/
 .mimocode/
-debugfiles.list
-debuglinks.list
-debugsourcefiles.list
-debugsources.list
-documentation.list
-elfbins.list
 tests/build/
-.qmake.stash
