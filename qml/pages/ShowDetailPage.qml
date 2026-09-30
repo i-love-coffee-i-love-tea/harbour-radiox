@@ -16,7 +16,7 @@ Page {
         PullDownMenu {
             MenuItem {
                 text: qsTr("View on radiox.de")
-                onClicked: Qt.openUrlExternally("https://www.radiox.de/sendungen/" + showDetailPage.slug)
+                onClicked: Qt.openUrlExternally(radioXCore.baseUrl + "/sendungen/" + showDetailPage.slug)
             }
         }
 

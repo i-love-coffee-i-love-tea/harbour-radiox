@@ -1,14 +1,14 @@
-#ifndef NETWORKFETCHER_H
-#define NETWORKFETCHER_H
+#ifndef SITEFETCHER_H
+#define SITEFETCHER_H
 
 #include <QObject>
 #include <QNetworkAccessManager>
 
-class NetworkFetcher : public QObject
+class SiteFetcher : public QObject
 {
     Q_OBJECT
 public:
-    explicit NetworkFetcher(QObject *parent = nullptr, QNetworkAccessManager *nam = nullptr);
+    explicit SiteFetcher(QObject *parent = nullptr, QNetworkAccessManager *nam = nullptr);
 
     void fetchProgramWeek(int weekOffset = 0);
     void fetchRecordings();
@@ -26,7 +26,6 @@ signals:
 
 private:
     QNetworkAccessManager *m_nam;
-    QString m_baseUrl;
 };
 
-#endif // NETWORKFETCHER_H
+#endif // SITEFETCHER_H

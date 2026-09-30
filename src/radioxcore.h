@@ -5,7 +5,7 @@
 #include "programmodel.h"
 #include "recordingsmodel.h"
 #include "sendetippsmodel.h"
-#include "networkfetcher.h"
+#include "sitefetcher.h"
 
 class RadioXCore : public QObject
 {
@@ -22,6 +22,7 @@ class RadioXCore : public QObject
     Q_PROPERTY(bool livestreamPlaying READ livestreamPlaying NOTIFY playbackUrlChanged)
     Q_PROPERTY(QVariantMap showDetail READ showDetail NOTIFY showDetailChanged)
     Q_PROPERTY(bool loadingShowDetail READ loadingShowDetail NOTIFY loadingShowDetailChanged)
+    Q_PROPERTY(QString baseUrl READ baseUrl CONSTANT)
 public:
     explicit RadioXCore(QObject *parent = nullptr);
 
@@ -37,6 +38,7 @@ public:
     bool livestreamPlaying() const;
     QVariantMap showDetail() const;
     bool loadingShowDetail() const;
+    QString baseUrl() const;
 
     Q_INVOKABLE void refresh();
     Q_INVOKABLE void fetchShowDetail(const QString &slug);
@@ -59,7 +61,7 @@ private:
     ProgramModel *m_programModel;
     RecordingsModel *m_recordingsModel;
     SendetippsModel *m_sendetippsModel;
-    NetworkFetcher *m_fetcher;
+    SiteFetcher *m_fetcher;
     bool m_loading = false;
     QString m_errorMessage;
     QString m_lastInfo;

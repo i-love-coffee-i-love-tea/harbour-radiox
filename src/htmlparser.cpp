@@ -1,9 +1,53 @@
 #include "htmlparser.h"
+#include "radioxsite.h"
 #include <libxml/HTMLparser.h>
 #include <libxml/xpath.h>
 #include <libxml/xpathInternals.h>
 #include <QRegularExpression>
 #include <QTextDocument>
+
+// ---------------------------------------------------------------------------
+// XPath selectors — update these when radiox.de HTML structure changes
+// ---------------------------------------------------------------------------
+namespace {
+// Program week (schedule table)
+const char* kXPath_WeekLabel     = "//div[@class='program-week-header']/p";
+const char* kXPath_DayHeaders    = "//th[@class='day']";
+const char* kXPath_ScheduleRows  = "//table[@id='weektable']//tbody/tr[@class='tbodytr']";
+const char* kXPath_HourCell      = "td[contains(@class,'time_show_week')]";
+const char* kXPath_DayCell       = "td[contains(@class,'hour_')]";
+const char* kXPath_ShowDiv       = "div[@class='show_week_hour']";
+const char* kXPath_FirstLink     = "a[1]";
+const char* kXPath_SendetippLink = ".//a[contains(@href,'sendetipps')]";
+
+// Recordings (plus7 archive)
+const char* kXPath_DaySection    = "//p[contains(@class,'plus7-day')]";
+const char* kXPath_RecordingLink = ".//a[contains(@onclick,'plus7_show_recording')]";
+
+// Sendetipps (broadcast tips)
+const char* kXPath_BlogPost      = "//div[@itemprop='blogPost']";
+const char* kXPath_TippTitle     = ".//h2[@itemprop='name']";
+const char* kXPath_TippShowLink  = ".//a[contains(@href,'/sendungen/')]";
+const char* kXPath_TippDateTime  = ".//strong[1]";
+const char* kXPath_TippDesc      = ".//p[not(.//strong) and not(.//a) and not(.//img)]";
+const char* kXPath_TippImage     = ".//img/@src";
+
+// Show detail page
+const char* kXPath_ShowTitle     = "//h1[@itemprop='name']";
+const char* kXPath_ArticleBody   = "//div[@itemprop='articleBody']";
+const char* kXPath_ArticleImage  = "//div[@itemprop='articleBody']//img/@src";
+
+// Text markers in schedule cells
+const char* kMarker_Dito         = "_dito";
+const char* kMarker_Repeat       = "(Wdh.)";
+const char* kMarker_Sendetipp    = "Sendetipp";
+
+// Regex patterns
+const char* kRe_Time             = "(\\d{2}:\\d{2})";
+const char* kRe_Date             = "(\\d{2}\\.\\d{2}\\.\\d{4})";
+const char* kRe_RecordingId      = "plus7_show_recording\\((\\d+)\\)";
+const char* kRe_SendetippBracket = "\\[.*?Sendetipp.*?\\]";
+} // namespace
 
 // ---------------------------------------------------------------------------
 // libxml2 helpers
@@ -58,7 +102,7 @@ static QString findTimeBefore(xmlNodePtr node)
     for (xmlNodePtr cur = node->prev; cur; cur = cur->prev) {
         if (cur->type == XML_TEXT_NODE) {
             QString text = QString::fromUtf8(reinterpret_cast<const char*>(cur->content));
-            QRegularExpression re(QStringLiteral("(\\d{2}:\\d{2})"));
+            QRegularExpression re{QLatin1String(kRe_Time)};
             QRegularExpressionMatch m = re.match(text);
             if (m.hasMatch())
                 return m.captured(1);
@@ -115,8 +159,7 @@ QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &wee
     if (!doc) return days;
 
     // 1. Week label
-    xmlXPathObjectPtr weekObj = xpathEval(doc, nullptr,
-        "//div[@class='program-week-header']/p");
+    xmlXPathObjectPtr weekObj = xpathEval(doc, nullptr, kXPath_WeekLabel);
     if (weekObj) {
         xmlNodePtr weekNode = xpathNode(weekObj, 0);
         if (weekNode)
@@ -125,7 +168,7 @@ QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &wee
     }
 
     // 2. Day labels
-    xmlXPathObjectPtr dayObj = xpathEval(doc, nullptr, "//th[@class='day']");
+    xmlXPathObjectPtr dayObj = xpathEval(doc, nullptr, kXPath_DayHeaders);
     if (!dayObj) { xmlFreeDoc(doc); return days; }
 
     int dayCount = xpathNodeCount(dayObj);
@@ -143,8 +186,7 @@ QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &wee
     xmlXPathFreeObject(dayObj);
 
     // 3. Iterate rows
-    xmlXPathObjectPtr rowObj = xpathEval(doc, nullptr,
-        "//table[@id='weektable']//tbody/tr[@class='tbodytr']");
+    xmlXPathObjectPtr rowObj = xpathEval(doc, nullptr, kXPath_ScheduleRows);
     if (!rowObj) { xmlFreeDoc(doc); return days; }
 
     int rowCount = xpathNodeCount(rowObj);
@@ -153,8 +195,7 @@ QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &wee
         xmlNodePtr rowNode = xpathNode(rowObj, r);
 
         // Hour from first time cell
-        xmlXPathObjectPtr hourObj = xpathEval(doc, rowNode,
-            "td[contains(@class,'time_show_week')]");
+        xmlXPathObjectPtr hourObj = xpathEval(doc, rowNode, kXPath_HourCell);
         if (!hourObj) continue;
 
         int hourCount = xpathNodeCount(hourObj);
@@ -167,8 +208,7 @@ QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &wee
         if (!ok) continue;
 
         // Day cells (cells with class containing 'hour_')
-        xmlXPathObjectPtr cellObj = xpathEval(doc, rowNode,
-            "td[contains(@class,'hour_')]");
+        xmlXPathObjectPtr cellObj = xpathEval(doc, rowNode, kXPath_DayCell);
         if (!cellObj) continue;
 
         int cellCount = xpathNodeCount(cellObj);
@@ -181,15 +221,14 @@ QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &wee
             QString cellClass = nodeAttr(cellNode, "class");
 
             // Dito check
-            if (cellClass.contains(QStringLiteral("_dito"))) {
+            if (cellClass.contains(QLatin1String(kMarker_Dito))) {
                 slot.isDito = true;
                 days[d].entries << slot;
                 continue;
             }
 
             // Get show_week_hour div content
-            xmlXPathObjectPtr divObj = xpathEval(doc, cellNode,
-                "div[@class='show_week_hour']");
+            xmlXPathObjectPtr divObj = xpathEval(doc, cellNode, kXPath_ShowDiv);
             if (!divObj || xpathNodeCount(divObj) == 0) {
                 if (divObj) xmlXPathFreeObject(divObj);
                 days[d].entries << slot;
@@ -201,7 +240,7 @@ QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &wee
             QString fullText = nodeText(divNode);
 
             // Show name from <a>
-            xmlXPathObjectPtr aObj = xpathEval(doc, divNode, "a[1]");
+            xmlXPathObjectPtr aObj = xpathEval(doc, divNode, kXPath_FirstLink);
             if (aObj && xpathNodeCount(aObj) > 0) {
                 xmlNodePtr aNode = xpathNode(aObj, 0);
                 slot.showName = nodeText(aNode);
@@ -215,28 +254,27 @@ QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &wee
                 // No link — plain text show name (e.g. "Musikmix")
                 slot.showName = fullText;
                 // Remove any (Wdh.) or [Sendetipp...] from it
-                slot.showName.remove(QStringLiteral("(Wdh.)"));
-                slot.showName.remove(QRegularExpression(QStringLiteral("\\[.*?Sendetipp.*?\\]")));
+                slot.showName.remove(QLatin1String(kMarker_Repeat));
+                slot.showName.remove(QRegularExpression(QLatin1String(kRe_SendetippBracket)));
                 slot.showName = slot.showName.trimmed();
             }
 
             // Repeat check
-            slot.isRepeat = fullText.contains(QStringLiteral("(Wdh.)"));
+            slot.isRepeat = fullText.contains(QLatin1String(kMarker_Repeat));
 
             // Subtitle: text after <br/> in the div
             xmlNodePtr brNode = findNextElement(divNode->children, "br");
             if (brNode) {
                 QString afterBr = textAfterElement(brNode);
                 // Strip (Wdh.) and [Sendetipp...] markup
-                afterBr.remove(QStringLiteral("(Wdh.)"));
-                afterBr.remove(QRegularExpression(QStringLiteral("\\[.*?Sendetipp.*?\\]")));
+                afterBr.remove(QLatin1String(kMarker_Repeat));
+                afterBr.remove(QRegularExpression(QLatin1String(kRe_SendetippBracket)));
                 slot.subtitle = afterBr.trimmed();
             }
 
             // Sendetipp link
-            if (fullText.contains(QStringLiteral("Sendetipp"))) {
-                xmlXPathObjectPtr stObj = xpathEval(doc, divNode,
-                    ".//a[contains(@href,'sendetipps')]");
+            if (fullText.contains(QLatin1String(kMarker_Sendetipp))) {
+                xmlXPathObjectPtr stObj = xpathEval(doc, divNode, kXPath_SendetippLink);
                 if (stObj && xpathNodeCount(stObj) > 0) {
                     slot.sendetippUrl = nodeAttr(xpathNode(stObj, 0), "href");
                     xmlXPathFreeObject(stObj);
@@ -268,8 +306,7 @@ QList<Recording> HtmlParser::parseRecordings(const QString &html)
     if (!doc) return recordings;
 
     // Each <p class="plus7-day"> is a day section
-    xmlXPathObjectPtr sectionObj = xpathEval(doc, nullptr,
-        "//p[contains(@class,'plus7-day')]");
+    xmlXPathObjectPtr sectionObj = xpathEval(doc, nullptr, kXPath_DaySection);
     if (!sectionObj) { xmlFreeDoc(doc); return recordings; }
 
     int sectionCount = xpathNodeCount(sectionObj);
@@ -279,15 +316,14 @@ QList<Recording> HtmlParser::parseRecordings(const QString &html)
 
         // Extract date from text content: "Montag, 28.09.2026"
         QString sectionText = nodeText(sectionNode);
-        QRegularExpression dateRe(QStringLiteral("(\\d{2}\\.\\d{2}\\.\\d{4})"));
+        QRegularExpression dateRe{QLatin1String(kRe_Date)};
         QRegularExpressionMatch dateMatch = dateRe.match(sectionText);
         QDate sectionDate;
         if (dateMatch.hasMatch())
             sectionDate = QDate::fromString(dateMatch.captured(1), QStringLiteral("dd.MM.yyyy"));
 
         // Find all recording links within this section
-        xmlXPathObjectPtr linkObj = xpathEval(doc, sectionNode,
-            ".//a[contains(@onclick,'plus7_show_recording')]");
+        xmlXPathObjectPtr linkObj = xpathEval(doc, sectionNode, kXPath_RecordingLink);
         if (!linkObj) continue;
 
         int linkCount = xpathNodeCount(linkObj);
@@ -302,7 +338,7 @@ QList<Recording> HtmlParser::parseRecordings(const QString &html)
 
             // Recording ID from onclick
             QString onclick = nodeAttr(aNode, "onclick");
-            QRegularExpression idRe(QStringLiteral("plus7_show_recording\\((\\d+)\\)"));
+            QRegularExpression idRe{QLatin1String(kRe_RecordingId)};
             QRegularExpressionMatch idMatch = idRe.match(onclick);
             if (idMatch.hasMatch()) {
                 rec.id = idMatch.captured(1).toInt();
@@ -345,8 +381,7 @@ QList<Sendetipp> HtmlParser::parseSendetipps(const QString &html)
     if (!doc) return tipps;
 
     // Each sendetipp is a <div class="item ..." itemprop="blogPost">
-    xmlXPathObjectPtr itemObj = xpathEval(doc, nullptr,
-        "//div[@itemprop='blogPost']");
+    xmlXPathObjectPtr itemObj = xpathEval(doc, nullptr, kXPath_BlogPost);
     if (!itemObj) { xmlFreeDoc(doc); return tipps; }
 
     int itemCount = xpathNodeCount(itemObj);
@@ -356,15 +391,13 @@ QList<Sendetipp> HtmlParser::parseSendetipps(const QString &html)
         Sendetipp t;
 
         // Title
-        xmlXPathObjectPtr titleObj = xpathEval(doc, itemNode,
-            ".//h2[@itemprop='name']");
+        xmlXPathObjectPtr titleObj = xpathEval(doc, itemNode, kXPath_TippTitle);
         if (titleObj && xpathNodeCount(titleObj) > 0)
             t.title = nodeText(xpathNode(titleObj, 0));
         if (titleObj) xmlXPathFreeObject(titleObj);
 
         // Show name + slug
-        xmlXPathObjectPtr showObj = xpathEval(doc, itemNode,
-            ".//a[contains(@href,'/sendungen/')]");
+        xmlXPathObjectPtr showObj = xpathEval(doc, itemNode, kXPath_TippShowLink);
         if (showObj && xpathNodeCount(showObj) > 0) {
             xmlNodePtr showNode = xpathNode(showObj, 0);
             t.showName = nodeText(showNode);
@@ -375,22 +408,19 @@ QList<Sendetipp> HtmlParser::parseSendetipps(const QString &html)
         if (showObj) xmlXPathFreeObject(showObj);
 
         // Date/time from first <strong>
-        xmlXPathObjectPtr strongObj = xpathEval(doc, itemNode,
-            ".//strong[1]");
+        xmlXPathObjectPtr strongObj = xpathEval(doc, itemNode, kXPath_TippDateTime);
         if (strongObj && xpathNodeCount(strongObj) > 0)
             t.dateTime = nodeText(xpathNode(strongObj, 0));
         if (strongObj) xmlXPathFreeObject(strongObj);
 
         // Description: <p> that doesn't contain <strong>, <a>, or <img>
-        xmlXPathObjectPtr descObj = xpathEval(doc, itemNode,
-            ".//p[not(.//strong) and not(.//a) and not(.//img)]");
+        xmlXPathObjectPtr descObj = xpathEval(doc, itemNode, kXPath_TippDesc);
         if (descObj && xpathNodeCount(descObj) > 0)
             t.description = nodeText(xpathNode(descObj, 0));
         if (descObj) xmlXPathFreeObject(descObj);
 
         // Image
-        xmlXPathObjectPtr imgObj = xpathEval(doc, itemNode,
-            ".//img/@src");
+        xmlXPathObjectPtr imgObj = xpathEval(doc, itemNode, kXPath_TippImage);
         if (imgObj && xpathNodeCount(imgObj) > 0) {
             xmlNodePtr srcNode = xpathNode(imgObj, 0);
             // For attribute nodes, content is the attribute value
@@ -429,8 +459,7 @@ QVariantMap HtmlParser::parseShowDetail(const QString &html)
     if (!doc) return result;
 
     // Title
-    xmlXPathObjectPtr titleObj = xpathEval(doc, nullptr,
-        "//h1[@itemprop='name']");
+    xmlXPathObjectPtr titleObj = xpathEval(doc, nullptr, kXPath_ShowTitle);
     if (titleObj && xpathNodeCount(titleObj) > 0) {
         result[QStringLiteral("title")] = nodeText(xpathNode(titleObj, 0));
         xmlXPathFreeObject(titleObj);
@@ -439,8 +468,7 @@ QVariantMap HtmlParser::parseShowDetail(const QString &html)
     }
 
     // Article body
-    xmlXPathObjectPtr bodyObj = xpathEval(doc, nullptr,
-        "//div[@itemprop='articleBody']");
+    xmlXPathObjectPtr bodyObj = xpathEval(doc, nullptr, kXPath_ArticleBody);
     if (bodyObj && xpathNodeCount(bodyObj) > 0) {
         xmlNodePtr bodyNode = xpathNode(bodyObj, 0);
         // Get inner HTML by serializing child nodes
@@ -457,15 +485,14 @@ QVariantMap HtmlParser::parseShowDetail(const QString &html)
     }
 
     // Image
-    xmlXPathObjectPtr imgObj = xpathEval(doc, nullptr,
-        "//div[@itemprop='articleBody']//img/@src");
+    xmlXPathObjectPtr imgObj = xpathEval(doc, nullptr, kXPath_ArticleImage);
     if (imgObj && xpathNodeCount(imgObj) > 0) {
         xmlNodePtr srcNode = xpathNode(imgObj, 0);
         if (srcNode->type == XML_ATTRIBUTE_NODE && srcNode->children) {
             QString src = QString::fromUtf8(
                 reinterpret_cast<const char*>(srcNode->children->content));
             if (!src.startsWith(QStringLiteral("http")))
-                src = QStringLiteral("https://www.radiox.de") + src;
+                src = RadioXSite::kBaseUrl + src;
             result[QStringLiteral("imageUrl")] = src;
         }
         xmlXPathFreeObject(imgObj);

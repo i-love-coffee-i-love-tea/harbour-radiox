@@ -7,7 +7,7 @@ PKGCONFIG += libxml-2.0
 SOURCES += \
     src/main.cpp \
     src/htmlparser.cpp \
-    src/networkfetcher.cpp \
+    src/sitefetcher.cpp \
     src/programmodel.cpp \
     src/recordingsmodel.cpp \
     src/sendetippsmodel.cpp \
@@ -15,7 +15,8 @@ SOURCES += \
 
 HEADERS += \
     src/htmlparser.h \
-    src/networkfetcher.h \
+    src/sitefetcher.h \
+    src/radioxsite.h \
     src/programmodel.h \
     src/recordingsmodel.h \
     src/sendetippsmodel.h \

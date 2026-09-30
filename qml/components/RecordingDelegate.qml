@@ -96,7 +96,7 @@ ListItem {
 
     onClicked: {
         if (recordingDelegate.playbackUrl.length > 0) {
-            Qt.openUrlExternally("https://www.radiox.de" + recordingDelegate.playbackUrl)
+            Qt.openUrlExternally(radioXCore.baseUrl + recordingDelegate.playbackUrl)
         }
     }
 }

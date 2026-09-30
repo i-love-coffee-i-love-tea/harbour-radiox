@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
     QScopedPointer<QGuiApplication> app(SailfishApp::application(argc, argv));
 
     QScopedPointer<QTranslator> translator(new QTranslator);
-    if (translator->load(QLocale(), "harbour-radiox", "-", SailfishApp::pathTo("translations"))) {
+    if (translator->load(QLocale(), "harbour-radiox", "-", SailfishApp::pathTo("translations").toLocalFile())) {
         app->installTranslator(translator.data());
     }
 
