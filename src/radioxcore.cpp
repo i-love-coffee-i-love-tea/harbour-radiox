@@ -44,33 +44,32 @@ RadioXCore::RadioXCore(QObject *parent)
         m_lastInfo = QStringLiteral("Recordings loaded");
         emit lastInfoChanged();
     });
-
-    // Set loading=false when any data arrives or on error
-    auto finishLoading = [this]() {
-        if (m_loading) {
-            m_loading = false;
-            emit loadingChanged();
+    connect(m_fetcher, &SiteFetcher::sendetippsReceived, this, [this]() {
+        m_lastInfo = QStringLiteral("Sendetipps loaded");
+        emit lastInfoChanged();
+        if (!m_errorMessage.isEmpty()) {
+            m_errorMessage.clear();
+            emit errorMessageChanged();
         }
-    };
-    connect(m_fetcher, &SiteFetcher::programWeekReceived, this, finishLoading);
-    connect(m_fetcher, &SiteFetcher::recordingsReceived, this, finishLoading);
-    connect(m_fetcher, &SiteFetcher::sendetippsReceived, this, finishLoading);
-    connect(m_fetcher, &SiteFetcher::networkError, this, finishLoading);
+    });
+
+    connect(m_fetcher, &SiteFetcher::loadingChanged,
+            this, &RadioXCore::loadingChanged);
 }
 
 ProgramModel* RadioXCore::programModel() const { return m_programModel; }
 RecordingsModel* RadioXCore::recordingsModel() const { return m_recordingsModel; }
 SendetippsModel* RadioXCore::sendetippsModel() const { return m_sendetippsModel; }
-bool RadioXCore::loading() const { return m_loading; }
+bool RadioXCore::loading() const { return m_fetcher->loading(); }
 
 QString RadioXCore::livestreamUrl() const
 {
-    return RadioXSite::kLivestreamUrl;
+    return RadioXSite::kLivestreamUrl();
 }
 
 QString RadioXCore::baseUrl() const
 {
-    return RadioXSite::kBaseUrl;
+    return RadioXSite::kBaseUrl();
 }
 
 QString RadioXCore::errorMessage() const
@@ -85,8 +84,6 @@ QString RadioXCore::lastInfo() const
 
 void RadioXCore::refresh()
 {
-    m_loading = true;
-    emit loadingChanged();
     m_lastInfo = QStringLiteral("Refreshing...");
     emit lastInfoChanged();
     m_fetcher->fetchProgramWeek(m_programModel->weekOffset());
@@ -105,7 +102,7 @@ void RadioXCore::playRecording(int id, const QString &title)
 {
     m_playbackTitle = title;
     emit playbackTitleChanged();
-    QUrl url(RadioXSite::kBaseUrl + RadioXSite::kPathPlayerPage.arg(id));
+    QUrl url(RadioXSite::kBaseUrl() + RadioXSite::kPathPlayerPage().arg(id));
     m_fetcher->fetchPlayerPage(url);
 }
 

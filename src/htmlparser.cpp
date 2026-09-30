@@ -99,10 +99,10 @@ static xmlNodePtr xpathNode(xmlXPathObjectPtr obj, int index)
 // Walk previous siblings to find text containing a time pattern (HH:MM)
 static QString findTimeBefore(xmlNodePtr node)
 {
+    static const QRegularExpression re{QLatin1String(kRe_Time)};
     for (xmlNodePtr cur = node->prev; cur; cur = cur->prev) {
         if (cur->type == XML_TEXT_NODE) {
             QString text = QString::fromUtf8(reinterpret_cast<const char*>(cur->content));
-            QRegularExpression re{QLatin1String(kRe_Time)};
             QRegularExpressionMatch m = re.match(text);
             if (m.hasMatch())
                 return m.captured(1);
@@ -152,6 +152,8 @@ static xmlDocPtr parseHtml(const QString &html)
 // ---------------------------------------------------------------------------
 QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &weekLabel)
 {
+    static const QRegularExpression sendetippRe{QLatin1String(kRe_SendetippBracket)};
+
     QList<ProgramDay> days;
     weekLabel.clear();
 
@@ -255,7 +257,7 @@ QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &wee
                 slot.showName = fullText;
                 // Remove any (Wdh.) or [Sendetipp...] from it
                 slot.showName.remove(QLatin1String(kMarker_Repeat));
-                slot.showName.remove(QRegularExpression(QLatin1String(kRe_SendetippBracket)));
+                slot.showName.remove(sendetippRe);
                 slot.showName = slot.showName.trimmed();
             }
 
@@ -268,7 +270,7 @@ QList<ProgramDay> HtmlParser::parseProgramWeek(const QString &html, QString &wee
                 QString afterBr = textAfterElement(brNode);
                 // Strip (Wdh.) and [Sendetipp...] markup
                 afterBr.remove(QLatin1String(kMarker_Repeat));
-                afterBr.remove(QRegularExpression(QLatin1String(kRe_SendetippBracket)));
+                afterBr.remove(sendetippRe);
                 slot.subtitle = afterBr.trimmed();
             }
 
@@ -315,8 +317,8 @@ QList<Recording> HtmlParser::parseRecordings(const QString &html)
         xmlNodePtr sectionNode = xpathNode(sectionObj, s);
 
         // Extract date from text content: "Montag, 28.09.2026"
+        static const QRegularExpression dateRe{QLatin1String(kRe_Date)};
         QString sectionText = nodeText(sectionNode);
-        QRegularExpression dateRe{QLatin1String(kRe_Date)};
         QRegularExpressionMatch dateMatch = dateRe.match(sectionText);
         QDate sectionDate;
         if (dateMatch.hasMatch())
@@ -337,8 +339,8 @@ QList<Recording> HtmlParser::parseRecordings(const QString &html)
             rec.showName = nodeText(aNode);
 
             // Recording ID from onclick
+            static const QRegularExpression idRe{QLatin1String(kRe_RecordingId)};
             QString onclick = nodeAttr(aNode, "onclick");
-            QRegularExpression idRe{QLatin1String(kRe_RecordingId)};
             QRegularExpressionMatch idMatch = idRe.match(onclick);
             if (idMatch.hasMatch()) {
                 rec.id = idMatch.captured(1).toInt();
@@ -492,7 +494,7 @@ QVariantMap HtmlParser::parseShowDetail(const QString &html)
             QString src = QString::fromUtf8(
                 reinterpret_cast<const char*>(srcNode->children->content));
             if (!src.startsWith(QStringLiteral("http")))
-                src = RadioXSite::kBaseUrl + src;
+                src = RadioXSite::kBaseUrl() + src;
             result[QStringLiteral("imageUrl")] = src;
         }
         xmlXPathFreeObject(imgObj);

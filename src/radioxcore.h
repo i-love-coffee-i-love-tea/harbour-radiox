@@ -62,7 +62,6 @@ private:
     RecordingsModel *m_recordingsModel;
     SendetippsModel *m_sendetippsModel;
     SiteFetcher *m_fetcher;
-    bool m_loading = false;
     QString m_errorMessage;
     QString m_lastInfo;
     QString m_playbackUrl;

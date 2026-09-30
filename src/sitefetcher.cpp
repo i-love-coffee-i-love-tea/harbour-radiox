@@ -3,7 +3,10 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QRegularExpression>
+#include <QTimer>
 #include <functional>
+
+static const int kRequestTimeoutMs = 10000;
 
 SiteFetcher::SiteFetcher(QObject *parent, QNetworkAccessManager *nam)
     : QObject(parent)
@@ -11,15 +14,33 @@ SiteFetcher::SiteFetcher(QObject *parent, QNetworkAccessManager *nam)
 {
 }
 
-static void getAndEmit(QNetworkAccessManager *nam, const QUrl &url,
-                        QObject *ctx, std::function<void(const QString &)> onSuccess,
-                        std::function<void(const QString &)> onError)
+bool SiteFetcher::loading() const
+{
+    return m_pendingRequests > 0;
+}
+
+void SiteFetcher::startRequest(const QUrl &url,
+                                std::function<void(const QString &)> onSuccess,
+                                std::function<void(const QString &)> onError)
 {
     QNetworkRequest req(url);
     req.setHeader(QNetworkRequest::UserAgentHeader, "harbour-radiox/0.1");
-    QNetworkReply *reply = nam->get(req);
-    QObject::connect(reply, &QNetworkReply::finished, ctx, [=]() {
+    QNetworkReply *reply = m_nam->get(req);
+
+    m_pendingRequests++;
+    emit loadingChanged();
+
+    // Abort on timeout — timer is parented to reply so it's cleaned up automatically
+    QTimer *timer = new QTimer(reply);
+    timer->setSingleShot(true);
+    timer->setInterval(kRequestTimeoutMs);
+    QObject::connect(timer, &QTimer::timeout, [reply]() { reply->abort(); });
+    timer->start();
+
+    QObject::connect(reply, &QNetworkReply::finished, this, [=]() {
         reply->deleteLater();
+        m_pendingRequests--;
+        emit loadingChanged();
         if (reply->error() != QNetworkReply::NoError) {
             onError(reply->errorString());
             return;
@@ -30,46 +51,46 @@ static void getAndEmit(QNetworkAccessManager *nam, const QUrl &url,
 
 void SiteFetcher::fetchProgramWeek(int weekOffset)
 {
-    QString path = RadioXSite::kPathProgramWeek;
+    QString path = RadioXSite::kPathProgramWeek();
     if (weekOffset != 0)
         path += QStringLiteral("/%1").arg(weekOffset);
-    QUrl url(RadioXSite::kBaseUrl + path);
-    getAndEmit(m_nam, url, this,
+    QUrl url(RadioXSite::kBaseUrl() + path);
+    startRequest(url,
         [this](const QString &html) { emit programWeekReceived(html); },
         [this](const QString &err) { emit networkError(err); });
 }
 
 void SiteFetcher::fetchRecordings()
 {
-    QUrl url(RadioXSite::kBaseUrl + RadioXSite::kPathRecordings);
-    getAndEmit(m_nam, url, this,
+    QUrl url(RadioXSite::kBaseUrl() + RadioXSite::kPathRecordings());
+    startRequest(url,
         [this](const QString &html) { emit recordingsReceived(html); },
         [this](const QString &err) { emit networkError(err); });
 }
 
 void SiteFetcher::fetchSendetipps()
 {
-    QUrl url(RadioXSite::kBaseUrl + RadioXSite::kPathSendetipps);
-    getAndEmit(m_nam, url, this,
+    QUrl url(RadioXSite::kBaseUrl() + RadioXSite::kPathSendetipps());
+    startRequest(url,
         [this](const QString &html) { emit sendetippsReceived(html); },
         [this](const QString &err) { emit networkError(err); });
 }
 
 void SiteFetcher::fetchShowDetail(const QString &slug)
 {
-    QUrl url(RadioXSite::kBaseUrl + RadioXSite::kPathShowDetail.arg(slug));
-    getAndEmit(m_nam, url, this,
+    QUrl url(RadioXSite::kBaseUrl() + RadioXSite::kPathShowDetail().arg(slug));
+    startRequest(url,
         [this](const QString &html) { emit showDetailReceived(html); },
         [this](const QString &err) { emit networkError(err); });
 }
 
 void SiteFetcher::fetchPlayerPage(const QUrl &url)
 {
-    getAndEmit(m_nam, url, this,
+    startRequest(url,
         [this](const QString &html) {
             // Try <audio src="..."> or <source src="...">
             static QRegularExpression srcRe(
-                RadioXSite::kReAudioSrc,
+                QLatin1String(RadioXSite::kReAudioSrc),
                 QRegularExpression::CaseInsensitiveOption);
             QRegularExpressionMatch m = srcRe.match(html);
             if (m.hasMatch()) {
@@ -78,7 +99,7 @@ void SiteFetcher::fetchPlayerPage(const QUrl &url)
             }
             // Try any URL that looks like an audio stream
             static QRegularExpression audioRe(
-                RadioXSite::kReAudioFile,
+                QLatin1String(RadioXSite::kReAudioFile),
                 QRegularExpression::CaseInsensitiveOption);
             m = audioRe.match(html);
             if (m.hasMatch()) {

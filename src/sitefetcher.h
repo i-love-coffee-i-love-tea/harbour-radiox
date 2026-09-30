@@ -3,12 +3,15 @@
 
 #include <QObject>
 #include <QNetworkAccessManager>
+#include <functional>
 
 class SiteFetcher : public QObject
 {
     Q_OBJECT
 public:
     explicit SiteFetcher(QObject *parent = nullptr, QNetworkAccessManager *nam = nullptr);
+
+    bool loading() const;
 
     void fetchProgramWeek(int weekOffset = 0);
     void fetchRecordings();
@@ -23,9 +26,15 @@ signals:
     void showDetailReceived(const QString &html);
     void playerPageReceived(const QString &audioUrl);
     void networkError(const QString &errorString);
+    void loadingChanged();
 
 private:
+    void startRequest(const QUrl &url,
+                      std::function<void(const QString &)> onSuccess,
+                      std::function<void(const QString &)> onError);
+
     QNetworkAccessManager *m_nam;
+    int m_pendingRequests = 0;
 };
 
 #endif // SITEFETCHER_H

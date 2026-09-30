@@ -11,6 +11,7 @@ private:
     QString m_programWeekHtml;
     QString m_plus7Html;
     QString m_sendetippsHtml;
+    QString m_showDetailHtml;
 
     QString loadFixture(const QString &name)
     {
@@ -39,9 +40,11 @@ private slots:
         m_programWeekHtml = loadFixture("program_week.html");
         m_plus7Html = loadFixture("plus7_content_all.html");
         m_sendetippsHtml = loadFixture("sendetipps.html");
+        m_showDetailHtml = loadFixture("show_detail.html");
         QVERIFY2(!m_programWeekHtml.isEmpty(), "Failed to load program_week.html fixture");
         QVERIFY2(!m_plus7Html.isEmpty(), "Failed to load plus7_content_all.html fixture");
         QVERIFY2(!m_sendetippsHtml.isEmpty(), "Failed to load sendetipps.html fixture");
+        QVERIFY2(!m_showDetailHtml.isEmpty(), "Failed to load show_detail.html fixture");
     }
 
     // --- parseProgramWeek tests ---
@@ -183,6 +186,53 @@ private slots:
         QVERIFY(!tipps[1].title.isEmpty());
         QVERIFY(!tipps[1].showName.isEmpty());
         QVERIFY(!tipps[1].showSlug.isEmpty());
+    }
+
+    // --- parseShowDetail tests ---
+
+    void testParseShowDetail_title()
+    {
+        QVariantMap detail = HtmlParser::parseShowDetail(m_showDetailHtml);
+        QCOMPARE(detail["title"].toString(), QStringLiteral("Sounds & Tapes"));
+    }
+
+    void testParseShowDetail_description()
+    {
+        QVariantMap detail = HtmlParser::parseShowDetail(m_showDetailHtml);
+        QString desc = detail["description"].toString();
+        QVERIFY(desc.contains("experimental music"));
+        QVERIFY(desc.contains("Frankfurt"));
+    }
+
+    void testParseShowDetail_imageUrl()
+    {
+        QVariantMap detail = HtmlParser::parseShowDetail(m_showDetailHtml);
+        QString imgUrl = detail["imageUrl"].toString();
+        QVERIFY(imgUrl.contains("sounds-and-tapes.jpg"));
+    }
+
+    void testParseShowDetail_relativeImageUrl()
+    {
+        // Relative image URL should be prefixed with base URL
+        QVariantMap detail = HtmlParser::parseShowDetail(m_showDetailHtml);
+        QString imgUrl = detail["imageUrl"].toString();
+        QVERIFY(imgUrl.startsWith("http"));
+    }
+
+    void testParseShowDetail_emptyHtml()
+    {
+        QVariantMap detail = HtmlParser::parseShowDetail(QString());
+        QVERIFY(detail.isEmpty());
+    }
+
+    void testParseShowDetail_missingFields()
+    {
+        // Minimal HTML with no article body
+        QString html = QStringLiteral("<html><body><h1 itemprop=\"name\">Test</h1></body></html>");
+        QVariantMap detail = HtmlParser::parseShowDetail(html);
+        QCOMPARE(detail["title"].toString(), QStringLiteral("Test"));
+        QVERIFY(!detail.contains("description"));
+        QVERIFY(!detail.contains("imageUrl"));
     }
 };
 
