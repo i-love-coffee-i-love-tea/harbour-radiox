@@ -1,33 +1,54 @@
 #!/bin/bash
 # Build harbour-radiox for Sailfish OS via sfdk shadow build.
 #
+# Builds for all three architectures against SailfishOS-4.6.0.13.
+#
 # Prerequisites:
 #   - Sailfish SDK installed with Docker engine
 #   - sfdk in PATH (e.g. ~/SailfishOS/bin/sfdk)
-#   - Build target set: e.g. SailfishOS-5.1.0.11-aarch64
+#   - Build targets installed: SailfishOS-4.6.0.13-{i486,armv7hl,aarch64}
+#
+# Usage:
+#   ./build-sailfish.sh                  # build all three arches
+#   ./build-sailfish.sh aarch64          # build one arch only
+#   SAILFISH_VERSION=5.1.0.11 ./build-sailfish.sh  # override SDK version
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TARGET="${SAILFISH_TARGET:-SailfishOS-5.1.0.11-aarch64}"
-BUILD_DIR="$SCRIPT_DIR/build"
+VERSION="${SAILFISH_VERSION:-4.6.0.13}"
+ALL_ARCHES="i486 armv7hl aarch64"
+ARCHES="${*:-$ALL_ARCHES}"
 
-mkdir -p "$BUILD_DIR"
+mkdir -p "$SCRIPT_DIR/rpms"
 
-# Symlink source directories into build dir so the RPM spec's relative paths work
-for d in src qml rpm; do
-    [ ! -e "$BUILD_DIR/$d" ] && ln -s "$SCRIPT_DIR/$d" "$BUILD_DIR/$d"
+for ARCH in $ARCHES; do
+    TARGET="SailfishOS-${VERSION}-${ARCH}"
+    BUILD_DIR="$SCRIPT_DIR/build-${ARCH}"
+
+    echo ""
+    echo "=== Building harbour-radiox for ${ARCH} (target: ${TARGET}) ==="
+    echo ""
+
+    mkdir -p "$BUILD_DIR"
+
+    # Symlink source directories into build dir so the RPM spec's relative paths work
+    for d in src qml rpm translations; do
+        if [ ! -e "$BUILD_DIR/$d" ]; then
+            ln -s "$SCRIPT_DIR/$d" "$BUILD_DIR/$d"
+        fi
+    done
+
+    cd "$BUILD_DIR"
+    sfdk -c target="$TARGET" build "$SCRIPT_DIR"
+
+    if ls "$BUILD_DIR"/RPMS/*.rpm >/dev/null 2>&1; then
+        cp "$BUILD_DIR"/RPMS/*.rpm "$SCRIPT_DIR/rpms/"
+    fi
+
+    echo "=== Done: ${ARCH} ==="
 done
 
-echo "=== Building harbour-radiox via sfdk (target: $TARGET) ==="
-cd "$BUILD_DIR"
-sfdk -c target="$TARGET" build "$SCRIPT_DIR"
-
-echo "=== Copying RPM to rpms/ ==="
-mkdir -p "$SCRIPT_DIR/rpms"
-if ls "$BUILD_DIR"/RPMS/*.rpm >/dev/null 2>&1; then
-    mv "$BUILD_DIR"/RPMS/*.rpm "$SCRIPT_DIR/rpms/"
-fi
-
-echo "=== Done ==="
+echo ""
+echo "=== All builds complete ==="
 ls -lh "$SCRIPT_DIR/rpms/"*.rpm 2>/dev/null || true
