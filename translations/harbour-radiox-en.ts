@@ -36,9 +36,14 @@ Browse the schedule, listen to recordings, and tune into the livestream.</transl
         <translation>radio x</translation>
     </message>
     <message>
-        <location filename="../qml/cover/CoverPage.qml" line="28"/>
+        <location filename="../qml/cover/CoverPage.qml" line="31"/>
         <source>Playing…</source>
         <translation>Playing…</translation>
+    </message>
+    <message>
+        <location filename="../qml/cover/CoverPage.qml" line="32"/>
+        <source>Paused</source>
+        <translation>Paused</translation>
     </message>
     <message>
         <location filename="../qml/cover/CoverPage.qml" line="29"/>

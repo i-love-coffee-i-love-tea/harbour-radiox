@@ -24,9 +24,13 @@ CoverBackground {
         }
 
         Label {
-            text: radioXCore.playbackUrl.length > 0
-                  ? qsTr("Playing…")
-                  : qsTr("Stopped")
+            text: {
+                if (radioXCore.playbackUrl.length === 0)
+                    return qsTr("Stopped")
+                return audioPlayer.playbackState === Audio.PlayingState
+                        ? qsTr("Playing…")
+                        : qsTr("Paused")
+            }
             anchors.horizontalCenter: parent.horizontalCenter
             font.pixelSize: Theme.fontSizeSmall
             color: Theme.secondaryColor
@@ -37,7 +41,7 @@ CoverBackground {
         id: coverActions
 
         CoverAction {
-            iconSource: radioXCore.playbackUrl.length > 0
+            iconSource: audioPlayer.playbackState === Audio.PlayingState
                         ? "image://theme/icon-cover-pause"
                         : "image://theme/icon-cover-play"
             onTriggered: {

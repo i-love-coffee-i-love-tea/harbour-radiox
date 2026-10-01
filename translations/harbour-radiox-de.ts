@@ -36,9 +36,14 @@ Programm durchsuchen, Aufnahmen anhören und in den Livestream einschalten.</tra
         <translation>radio x</translation>
     </message>
     <message>
-        <location filename="../qml/cover/CoverPage.qml" line="28"/>
+        <location filename="../qml/cover/CoverPage.qml" line="31"/>
         <source>Playing…</source>
         <translation>Wiedergabe…</translation>
+    </message>
+    <message>
+        <location filename="../qml/cover/CoverPage.qml" line="32"/>
+        <source>Paused</source>
+        <translation>Pausiert</translation>
     </message>
     <message>
         <location filename="../qml/cover/CoverPage.qml" line="29"/>
