@@ -27,9 +27,11 @@ CoverBackground {
             text: {
                 if (radioXCore.playbackUrl.length === 0)
                     return qsTr("Stopped")
-                return audioPlayer.playbackState === Audio.PlayingState
+                if (audioPlayer.playbackState !== Audio.PlayingState)
+                    return qsTr("Stopped")
+                return radioXCore.playbackTitle.length > 0
                         ? qsTr("Playing…")
-                        : qsTr("Paused")
+                        : qsTr("Live")
             }
             anchors.horizontalCenter: parent.horizontalCenter
             font.pixelSize: Theme.fontSizeSmall
@@ -45,11 +47,13 @@ CoverBackground {
                         ? "image://theme/icon-cover-pause"
                         : "image://theme/icon-cover-play"
             onTriggered: {
-                if (radioXCore.playbackUrl.length > 0) {
-                    if (audioPlayer.playbackState === Audio.PlayingState)
+                if (audioPlayer.playbackState === Audio.PlayingState) {
+                    if (radioXCore.playbackTitle.length > 0)
                         audioPlayer.pause()
                     else
-                        audioPlayer.play()
+                        radioXCore.stopPlayback()
+                } else if (radioXCore.playbackUrl.length > 0) {
+                    audioPlayer.play()
                 } else {
                     radioXCore.openLivestream()
                 }

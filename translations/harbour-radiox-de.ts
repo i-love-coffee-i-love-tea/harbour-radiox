@@ -42,8 +42,8 @@ Programm durchsuchen, Aufnahmen anhören und in den Livestream einschalten.</tra
     </message>
     <message>
         <location filename="../qml/cover/CoverPage.qml" line="32"/>
-        <source>Paused</source>
-        <translation>Pausiert</translation>
+        <source>Live</source>
+        <translation>Live</translation>
     </message>
     <message>
         <location filename="../qml/cover/CoverPage.qml" line="29"/>
@@ -102,6 +102,11 @@ Programm durchsuchen, Aufnahmen anhören und in den Livestream einschalten.</tra
         <location filename="../qml/pages/MainPage.qml" line="118"/>
         <source>radio x Live</source>
         <translation>radio x Live</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/MainPage.qml" line="121"/>
+        <source>Live</source>
+        <translation>Live</translation>
     </message>
     <message>
         <location filename="../qml/pages/MainPage.qml" line="218"/>

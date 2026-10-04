@@ -1,4 +1,5 @@
 import QtQuick 2.6
+import QtMultimedia 5.0
 import Sailfish.Silica 1.0
 
 ListItem {
@@ -138,7 +139,7 @@ ListItem {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {
-                            if (radioXCore.livestreamPlaying)
+                            if (audioPlayer.playbackState === Audio.PlayingState)
                                 radioXCore.stopPlayback()
                             else
                                 radioXCore.openLivestream()
@@ -147,7 +148,7 @@ ListItem {
                             anchors.centerIn: parent
                             width: Theme.iconSizeMedium
                             height: Theme.iconSizeMedium
-                            source: radioXCore.livestreamPlaying
+                            source: audioPlayer.playbackState === Audio.PlayingState
                                     ? "image://theme/icon-m-stop"
                                     : "image://theme/icon-m-play"
                             opacity: parent.pressed ? 0.4 : 1.0

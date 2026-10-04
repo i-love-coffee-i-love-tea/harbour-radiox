@@ -111,14 +111,17 @@ Page {
                                 Layout.fillWidth: true
                                 Layout.alignment: Qt.AlignVCenter
                                 text: {
-                                    var state = audioPlayer.playbackState === Audio.PlayingState
-                                                ? qsTr("Playing") : qsTr("Paused")
+                                    if (audioPlayer.playbackState !== Audio.PlayingState) {
+                                        if (mainPage.isRecording)
+                                            return qsTr("Paused")
+                                        return qsTr("Stopped")
+                                    }
                                     if (mainPage.isRecording) {
                                         var title = radioXCore.playbackTitle
                                         return (title.length > 0 ? title : qsTr("Recording"))
-                                               + " \u2014 " + state
+                                               + " \u2014 " + qsTr("Playing")
                                     }
-                                    return qsTr("radio x Live") + " \u2014 " + state
+                                    return qsTr("radio x Live") + " \u2014 " + qsTr("Live")
                                 }
                                 color: Theme.highlightColor
                                 font.pixelSize: Theme.fontSizeSmall
@@ -133,10 +136,14 @@ Page {
                                 MouseArea {
                                     anchors.fill: parent
                                     onClicked: {
-                                        if (audioPlayer.playbackState === Audio.PlayingState)
-                                            audioPlayer.pause()
-                                        else
+                                        if (audioPlayer.playbackState === Audio.PlayingState) {
+                                            if (mainPage.isRecording)
+                                                audioPlayer.pause()
+                                            else
+                                                radioXCore.stopPlayback()
+                                        } else {
                                             audioPlayer.play()
+                                        }
                                     }
                                     Image {
                                         anchors.centerIn: parent
