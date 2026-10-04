@@ -12,6 +12,19 @@
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
   <releases>
+    <release version="1.0.1" date="2026-10-04">
+      <description>
+        <p>Bug fixes and improvements.</p>
+        <ul>
+          <li>Fix cover not showing play/pause state correctly when paused</li>
+          <li>Always show play/pause button on main page</li>
+          <li>Fix day card peek on Xperia X (PathView highlight offset)</li>
+          <li>Declare Internet privileges for mapplauncherd</li>
+          <li>Fix Sailjail desktop file format and add Audio permission</li>
+          <li>Build RPMs without git-suffixed version numbers</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.0.0" date="2026-09-30">
       <description><p>Initial release.</p></description>
     </release>
