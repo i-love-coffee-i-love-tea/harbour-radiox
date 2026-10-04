@@ -126,7 +126,6 @@ Page {
                                 Layout.preferredWidth: Theme.itemSizeSmall
                                 Layout.preferredHeight: Theme.itemSizeSmall
                                 Layout.alignment: Qt.AlignVCenter
-                                visible: mainPage.isRecording
 
                                 MouseArea {
                                     anchors.fill: parent
