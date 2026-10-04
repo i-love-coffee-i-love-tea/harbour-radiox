@@ -1,4 +1,5 @@
 import QtQuick 2.6
+import QtMultimedia 5.0
 import Sailfish.Silica 1.0
 
 ListItem {
@@ -83,13 +84,24 @@ ListItem {
             }
         }
 
-        // Play icon
+        // Play/pause icon
         IconButton {
             id: playIcon
+            property bool isActive: radioXCore.playbackTitle === recordingDelegate.showName
+                                    && radioXCore.playbackUrl.length > 0
+                                    && !radioXCore.livestreamPlaying
             anchors.verticalCenter: parent.verticalCenter
-            icon.source: "image://theme/icon-m-play"
+            icon.source: isActive && audioPlayer.playbackState === Audio.PlayingState
+                         ? "image://theme/icon-m-pause"
+                         : "image://theme/icon-m-play"
             onClicked: {
-                radioXCore.playRecording(recordingDelegate.recordingId, recordingDelegate.showName)
+                if (isActive && audioPlayer.playbackState === Audio.PlayingState) {
+                    audioPlayer.pause()
+                } else if (isActive) {
+                    audioPlayer.play()
+                } else {
+                    radioXCore.playRecording(recordingDelegate.recordingId, recordingDelegate.showName)
+                }
             }
         }
     }
