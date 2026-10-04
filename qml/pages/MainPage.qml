@@ -48,6 +48,9 @@ Page {
         onCurrentIndexChanged: mainPage.selectedDay = currentIndex
         itemWidth: width
         itemHeight: height
+        preferredHighlightBegin: 0.505
+        preferredHighlightEnd: 0.505
+        clip: true
 
         delegate: SilicaListView {
             id: dayList
