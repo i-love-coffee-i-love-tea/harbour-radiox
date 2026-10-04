@@ -42,6 +42,10 @@ mkdir -p %{buildroot}%{_datadir}/metainfo
 install -m 644 rpm/%{name}.appdata.xml \
   %{buildroot}%{_datadir}/metainfo/%{name}.metainfo.xml
 
+mkdir -p %{buildroot}%{_datadir}/mapplauncherd/privileges.d
+install -m 644 privileges/%{name} \
+  %{buildroot}%{_datadir}/mapplauncherd/privileges.d/%{name}
+
 %files
 %defattr(-,root,root,-)
 %{_bindir}/%{name}
@@ -49,3 +53,4 @@ install -m 644 rpm/%{name}.appdata.xml \
 %{_datadir}/applications/%{name}.desktop
 %{_datadir}/icons/hicolor/*/apps/%{name}.png
 /usr/share/metainfo/%{name}.metainfo.xml
+%{_datadir}/mapplauncherd/privileges.d/%{name}

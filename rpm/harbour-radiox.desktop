@@ -4,6 +4,8 @@ Icon=harbour-radiox
 Type=Application
 Name=radio x
 X-Nemo-Application-Type=silica-qt5
-X-Sailjail-OrganizationName=harbour-radiox
-X-Sailjail-ApplicationName=harbour-radiox
-X-Sailjail-Permissions=Internet
+
+[X-Sailjail]
+OrganizationName=harbour-radiox
+ApplicationName=harbour-radiox
+Permissions=Audio;Internet
